@@ -1,9 +1,10 @@
-package jy.Job_Flow_Agent.GlobalErrorHandler;
+package jymusic.jym_api_gateway.GlobalErrorHandler;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authorization.AuthorizationDeniedException;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -50,6 +51,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler({AccessDeniedException.class, AuthorizationDeniedException.class})
     public ResponseEntity<Map<String, Object>> handleAccessDeniedException(Exception e) {
+
         log.error("권한 없는 접근 시도: {}", e.getMessage());
         Map<String, Object> errorResponse = createErrorResponse(
                 "HTTP_UNAUTHORIZED_ERROR",

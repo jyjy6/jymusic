@@ -1,4 +1,4 @@
-package jy.Job_Flow_Agent.GlobalErrorHandler;
+package jymusic.jym_api_gateway.GlobalErrorHandler;
 
 import org.springframework.http.HttpStatus;
 
