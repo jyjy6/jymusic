@@ -1,0 +1,52 @@
+# IDE & System
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Configuration & Secrets (Core Mandate)
+.env
+.env.*
+application.properties
+application-*.properties
+application.yml
+application-*.yml
+
+# Security & Keys
+*.pem
+*.key
+*.pub
+*.jks
+*.p12
+
+# Nuxt 4 / Frontend
+.nuxt/
+.output/
+node_modules/
+dist/
+.env
+.env.*
+
+# Logs
+*.log
+logs/
+
+# Custom Security & Configs
+application.properties
+application-*.properties
+application.yml
+application-*.yml
+.env
+.env.*
+*.pem
+*.key
+*.pub
+*.jks
+*.p12
