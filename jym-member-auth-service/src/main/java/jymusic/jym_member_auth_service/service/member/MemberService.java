@@ -1,6 +1,6 @@
 package jymusic.jym_member_auth_service.service.member;
 
-import jymusic.jym_member_auth_service.common.error.GlobalException;
+import jymusic.jym_member_auth_service.common.GlobalErrorHandler.GlobalException;
 import jymusic.jym_member_auth_service.common.jwt.JwtProvider;
 import jymusic.jym_member_auth_service.domain.member.Member;
 import jymusic.jym_member_auth_service.domain.member.MemberRepository;
@@ -61,7 +61,7 @@ public class MemberService {
         }
 
         // 3. Issue Tokens
-        String accessToken = jwtProvider.createAccessToken(member.getId(), member.getUsername(), member.getRole().name());
+        String accessToken = jwtProvider.createAccessToken(member.getId(), member.getUsername(), member.getRole().name(), member.getNickname());
         String refreshToken = jwtProvider.createRefreshToken(member.getUsername());
 
         // 4. Return both for controller to handle
