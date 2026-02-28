@@ -1,0 +1,134 @@
+openapi: 3.0.1
+info:
+  title: Jymusic 결제 서비스 API
+  description: 주문에 대한 결제 처리 및 거래 상태 확인을 위한 API 명세입니다.
+  version: 1.0.0
+servers:
+  - url: /api/v1
+    description: API 게이트웨이 경로
+
+paths:
+  /payments/checkout:
+    post:
+      tags:
+        - 결제
+      summary: 결제 처리 (체크아웃)
+      description: 생성된 주문에 대해 신용카드, 계좌이체 등의 수단으로 결제를 수행합니다.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentRequest'
+      responses:
+        '200':
+          description: 결제 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '402':
+          description: 결제 실패 (잔액 부족 등)
+          $ref: '#/components/responses/ErrorResponse'
+
+  /payments/{paymentId}:
+    get:
+      tags:
+        - 결제
+      summary: 결제 거래 정보 조회
+      description: 특정 결제 거래의 상세 상태와 정보를 조회합니다.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: paymentId
+          in: path
+          required: true
+          description: 조회할 결제 거래 ID (Transaction ID)
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 결제 정보 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentDetail'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    ErrorResponse:
+      description: GlobalErrorHandler 기반의 공통 오류 응답
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+    PaymentRequest:
+      type: object
+      required: [orderId, paymentMethod, amount]
+      properties:
+        orderId:
+          type: integer
+          description: 결제할 주문 ID
+        paymentMethod:
+          type: string
+          description: 결제 수단
+          enum: [CREDIT_CARD, BANK_TRANSFER, POINT]
+        amount:
+          type: number
+          description: 결제 금액
+
+    PaymentResponse:
+      type: object
+      properties:
+        transactionId:
+          type: string
+          description: 거래 고유 식별자
+        status:
+          type: string
+          description: 결제 결과 상태
+          enum: [SUCCESS, FAILED, PROCESSING]
+        paidAmount:
+          type: number
+
+    PaymentDetail:
+      type: object
+      properties:
+        transactionId:
+          type: string
+        orderId:
+          type: integer
+        status:
+          type: string
+        paymentMethod:
+          type: string
+        paidAmount:
+          type: number
+        completedAt:
+          type: string
+          format: date-time
+          description: 결제 완료 일시
+
+    ErrorResponse:
+      type: object
+      properties:
+        status:
+          type: integer
+        code:
+          type: string
+        message:
+          type: string
+        timestamp:
+          type: string
+          format: date-time

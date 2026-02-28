@@ -17,6 +17,9 @@ The Jymusic project is a Music Album E-commerce platform built on a Microservice
 - **State Management**: Use Pinia for centralized state management if needed.
 
 ### 2.2 Backend Standards (Spring Boot)
+- **Lombok**: MANDATORY use of Lombok to reduce boilerplate code.
+- **DTO (Data Transfer Object)**: MUST use DTOs for API requests and responses. NEVER expose Entities directly.
+- **Builder Pattern**: Highly PREFERRED for creating DTO and Entity instances to ensure immutability and readability.
 - **Global Error Handling**: MUST use `GlobalErrorHandler.GlobalException` for all business logic exceptions.
 - **Exception Pattern**: Implement a unified error response via the centralized `GlobalExceptionHandler`.
 - **API Gateway**: The gateway (`jym-api-gateway`) is the single entry point for all client requests.
