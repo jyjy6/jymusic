@@ -1,0 +1,159 @@
+openapi: 3.0.1
+info:
+  title: Jymusic 회원 및 인증 서비스 API
+  description: 사용자 인증, 회원가입 및 프로필 관리를 위한 API 명세입니다.
+  version: 1.0.0
+servers:
+  - url: /api/v1
+    description: API 게이트웨이 경로
+
+paths:
+  /auth/register:
+    post:
+      tags:
+        - 인증/권한
+      summary: 신규 회원 가입
+      description: 새로운 사용자를 시스템에 등록합니다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: 회원 가입 성공
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /auth/login:
+    post:
+      tags:
+        - 인증/권한
+      summary: 사용자 로그인
+      description: 유니크한 username과 비밀번호로 로그인하여 JWT 토큰을 발급받습니다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: 로그인 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthTokenResponse"
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /members/me:
+    get:
+      tags:
+        - 회원
+      summary: 내 프로필 조회
+      description: 현재 로그인한 사용자의 상세 정보를 조회합니다.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: 프로필 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemberProfile"
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    ErrorResponse:
+      description: GlobalErrorHandler 기반의 공통 오류 응답
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  schemas:
+    RegisterRequest:
+      type: object
+      required: [username, password, nickname]
+      properties:
+        username:
+          type: string
+          format: username
+          description: 사용자 로그인 아이디
+        password:
+          type: string
+          minLength: 4
+          description: 비밀번호 (최소 4자 이상)
+        nickname:
+          type: string
+          description: 서비스에서 사용할 닉네임
+        email:
+          type: string
+          description: 사용자 이메일 주소
+
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+
+    AuthTokenResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+          description: 액세스 토큰
+        tokenType:
+          type: string
+          example: Bearer
+
+    MemberProfile:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: 사용자 고유 식별자
+        email:
+          type: string
+          format: email
+          description: 사용자 이메일 주소
+        username:
+          type: string
+          description: 사용자 로그인 아이디 (또는 별칭)
+        nickname:
+          type: string
+          description: 서비스 내 표시될 닉네임
+        role:
+          type: string
+          description: 사용자의 시스템 권한 수준
+          enum: [ROLE_ADMIN, ROLE_USER]
+          example: ROLE_USER
+
+    ErrorResponse:
+      type: object
+      properties:
+        status:
+          type: integer
+          description: HTTP 상태 코드
+        code:
+          type: string
+          description: 내부 정의 비즈니스 오류 코드
+        message:
+          type: string
+          description: 상세 오류 메시지
+        timestamp:
+          type: string
+          format: date-time

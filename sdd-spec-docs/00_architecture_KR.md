@@ -17,6 +17,9 @@ Jymusic 프로젝트는 음악 앨범 판매 이커머스 서비스를 위한 �
 - **상태 관리**: 중앙 집중형 상태 관리가 필요한 경우 Pinia를 사용합니다.
 
 ### 2.2 백엔드 개발 표준 (Spring Boot)
+- **Lombok**: 보일러플레이트 코드 제거를 위해 Lombok 사용은 필수입니다.
+- **DTO (Data Transfer Object)**: API 요청과 응답에는 반드시 DTO를 사용해야 합니다. 엔티티를 직접 노출하지 마세요.
+- **Builder 패턴**: 불변성과 가독성을 보장하기 위해 DTO와 엔티티 생성 시 Builder 패턴을 매우 선호합니다.
 - **전역 에러 처리**: 비즈니스 로직에서 발생하는 모든 예외는 반드시 `GlobalErrorHandler.GlobalException`을 사용합니다.
 - **예외 처리 패턴**: 중앙 집중형 `GlobalExceptionHandler`를 통해 일관된 에러 응답 포맷을 제공합니다.
 - **API 게이트웨이**: 모든 클라이언트 요청은 `jym-api-gateway`를 거쳐 라우팅됩니다.
