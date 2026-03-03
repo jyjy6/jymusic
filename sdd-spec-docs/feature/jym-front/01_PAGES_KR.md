@@ -122,14 +122,15 @@ POST /api/v1/auth/logout  (Bearer 헤더 + 쿠키 자동 전송)
 
 ### `stores/auth.ts` (Pinia)
 ```
-state:
-  accessToken: string | null
-  user: { username, nickname, role } | null
+// Composition API 스타일 (Options API 금지)
+const accessToken = ref<string | null>(null)
+const user = ref<AuthUser | null>(null)
 
-actions:
-  setToken(token)
-  clearToken()
-  isLoggedIn (getter)
+const isLoggedIn = computed(() => accessToken.value !== null)
+
+const setAuth(token, authUser)  → 로그인 성공 시 호출
+const setToken(token)           → 토큰 갱신 성공 시 호출
+const clearAuth()               → 로그아웃 / 갱신 실패 시 호출
 ```
 
 ### `plugins/axios.ts`
@@ -165,20 +166,22 @@ actions:
 
 ---
 
-### `stores/auth.ts` (Pinia)
-```
-state:
-  accessToken: string | null
-  user: { id, username, nickname, role } | null
+### `stores/auth.ts` (Pinia) — 최신 정의
+```typescript
+export const useAuthStore = defineStore('auth', () => {
+  const accessToken = ref<string | null>(null)
+  const user = ref<AuthUser | null>(null)
 
-actions:
-  setAuth(token, user)   → 로그인 성공 시 호출
-  clearAuth()            → 로그아웃 / 갱신 실패 시 호출
-  setToken(token)        → 토큰 갱신 성공 시 호출
+  const isLoggedIn = computed(() => accessToken.value !== null)
 
-getters:
-  isLoggedIn: accessToken !== null
+  const setAuth = (token: string, authUser: AuthUser) => { ... }
+  const setToken = (token: string) => { ... }
+  const clearAuth = () => { ... }
+
+  return { accessToken, user, isLoggedIn, setAuth, setToken, clearAuth }
+})
 ```
+> **헌법 준수**: `<script setup lang="ts">` 기반 Composition API 스타일. Options API(`state`, `getters`, `actions` 객체) 사용 금지.
 
 ---
 
