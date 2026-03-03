@@ -15,6 +15,7 @@ The Jymusic project is a Music Album E-commerce platform built on a Microservice
 - **Composition API**: MUST use `<script setup lang="ts">` for all components.
 - **API Communication**: MUST use **Axios** for all external and internal API calls.
 - **State Management**: Use Pinia for centralized state management if needed.
+- **Styling**: MUST use **Tailwind CSS** for all styling. No scoped `<style>` blocks or external CSS files unless absolutely necessary. Class-based utility styling only.
 
 ### 2.2 Backend Standards (Spring Boot)
 - **Lombok**: MANDATORY use of Lombok to reduce boilerplate code.

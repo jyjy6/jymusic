@@ -48,6 +48,48 @@ paths:
         "401":
           $ref: "#/components/responses/ErrorResponse"
 
+  /auth/refresh-token:
+    post:
+      tags:
+        - 인증/권한
+      summary: Access Token 갱신
+      description: |
+        HttpOnly Cookie의 Refresh Token을 검증하여 새 Access Token을 발급합니다.
+        **Refresh Token Rotation(RTR)** 이 적용되어 새 Refresh Token도 Cookie로 재설정됩니다.
+        - 요청 바디 없음. 쿠키(`refreshToken`)를 자동으로 읽습니다.
+        - 갱신 성공 시 기존 Refresh Token은 Redis에서 즉시 무효화됩니다.
+      responses:
+        "200":
+          description: 토큰 갱신 성공
+          headers:
+            Set-Cookie:
+              description: 새 Refresh Token이 HttpOnly Cookie로 설정됩니다.
+              schema:
+                type: string
+                example: refreshToken=eyJ...; Path=/; HttpOnly; Max-Age=604800
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthTokenResponse"
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /auth/logout:
+    post:
+      tags:
+        - 인증/권한
+      summary: 로그아웃
+      description: |
+        Redis에서 Refresh Token을 삭제하고 Cookie를 만료시킵니다.
+        Access Token은 클라이언트(Pinia store)에서 직접 제거합니다.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: 로그아웃 성공
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+
   /members/me:
     get:
       tags:

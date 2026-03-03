@@ -4,14 +4,20 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.function.RouterFunction;
-import org.springframework.web.servlet.function.ServerRequest;
 import org.springframework.web.servlet.function.ServerResponse;
 
+import static org.springframework.cloud.gateway.server.mvc.filter.BeforeFilterFunctions.uri;
 import static org.springframework.cloud.gateway.server.mvc.handler.GatewayRouterFunctions.route;
 import static org.springframework.cloud.gateway.server.mvc.handler.HandlerFunctions.http;
-import static org.springframework.cloud.gateway.server.mvc.filter.BeforeFilterFunctions.uri;
 import static org.springframework.web.servlet.function.RequestPredicates.path;
 
+/**
+ * API Gateway 라우팅 설정.
+ *
+ * JwtVerificationFilter가 이미 X-User-Id / X-User-Name / X-User-Role 헤더를
+ * HttpServletRequestWrapper를 통해 요청에 주입하므로,
+ * 각 라우트는 단순히 목적지 URI를 지정하는 것만으로 사용자 컨텍스트를 전달할 수 있습니다.
+ */
 @Configuration
 public class GatewayRoutingConfig {
 
@@ -33,14 +39,6 @@ public class GatewayRoutingConfig {
                 .route(path("/api/v1/auth/**"), http())
                 .route(path("/api/v1/members/**"), http())
                 .before(uri(memberAuthUrl))
-                .filter((request, next) -> {
-                    ServerRequest modifiedRequest = ServerRequest.from(request)
-                            .header("X-User-Id", String.valueOf(request.attribute("X-User-Id").orElse("")))
-                            .header("X-User-Name", String.valueOf(request.attribute("X-User-Name").orElse("")))
-                            .header("X-User-Role", String.valueOf(request.attribute("X-User-Role").orElse("")))
-                            .build();
-                    return next.handle(modifiedRequest);
-                })
                 .build();
     }
 
@@ -58,14 +56,6 @@ public class GatewayRoutingConfig {
         return route("order_service")
                 .route(path("/api/v1/orders/**"), http())
                 .before(uri(orderUrl))
-                .filter((request, next) -> {
-                    ServerRequest modifiedRequest = ServerRequest.from(request)
-                            .header("X-User-Id", String.valueOf(request.attribute("X-User-Id").orElse("")))
-                            .header("X-User-Name", String.valueOf(request.attribute("X-User-Name").orElse("")))
-                            .header("X-User-Role", String.valueOf(request.attribute("X-User-Role").orElse("")))
-                            .build();
-                    return next.handle(modifiedRequest);
-                })
                 .build();
     }
 
@@ -74,14 +64,6 @@ public class GatewayRoutingConfig {
         return route("payment_service")
                 .route(path("/api/v1/payments/**"), http())
                 .before(uri(paymentUrl))
-                .filter((request, next) -> {
-                    ServerRequest modifiedRequest = ServerRequest.from(request)
-                            .header("X-User-Id", String.valueOf(request.attribute("X-User-Id").orElse("")))
-                            .header("X-User-Name", String.valueOf(request.attribute("X-User-Name").orElse("")))
-                            .header("X-User-Role", String.valueOf(request.attribute("X-User-Role").orElse("")))
-                            .build();
-                    return next.handle(modifiedRequest);
-                })
                 .build();
     }
 }

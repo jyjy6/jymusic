@@ -1,0 +1,564 @@
+openapi: 3.0.1
+info:
+  title: Jymusic API Gateway
+  description: |
+    Jymusic 플랫폼의 단일 진입점(API Gateway)입니다.
+    모든 클라이언트 요청은 이 게이트웨이를 통해 각 마이크로서비스로 라우팅됩니다.
+
+    **라우팅 규칙**
+    - `/api/v1/auth/**` → `jym-member-auth-service`
+    - `/api/v1/members/**` → `jym-member-auth-service`
+    - `/api/v1/products/**` → `jym-catalog-service`
+    - `/api/v1/categories/**` → `jym-catalog-service`
+    - `/api/v1/orders/**` → `jym-order-service`
+    - `/api/v1/payments/**` → `jym-payment-service`
+
+    **보안**
+    - 공개 경로(`/auth/**`)를 제외한 모든 요청은 `Authorization: Bearer <JWT>` 헤더가 필요합니다.
+    - JWT는 RS256 서명 방식으로 검증됩니다.
+    - 검증 성공 시 `X-User-Id`, `X-User-Name`, `X-User-Role` 헤더가 다운스트림 서비스로 주입됩니다.
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8080
+    description: 로컬 개발 서버 (API Gateway)
+
+tags:
+  - name: 인증/권한
+    description: 회원 인증 및 JWT 발급 (jym-member-auth-service 라우팅)
+  - name: 회원
+    description: 회원 프로필 관리 (jym-member-auth-service 라우팅, 인증 필요)
+  - name: 상품/카탈로그
+    description: 음반 상품 및 카테고리 조회 (jym-catalog-service 라우팅)
+  - name: 주문
+    description: 주문 생성 및 조회 (jym-order-service 라우팅, 인증 필요)
+  - name: 결제
+    description: 결제 처리 (jym-payment-service 라우팅, 인증 필요)
+
+paths:
+  # ──────────────────────────────────────────────────────────────────
+  # AUTH (Public) → jym-member-auth-service
+  # ──────────────────────────────────────────────────────────────────
+  /api/v1/auth/register:
+    post:
+      tags:
+        - 인증/권한
+      summary: 신규 회원 가입
+      description: 새로운 사용자를 시스템에 등록합니다. 인증 불필요.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: 회원 가입 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemberProfile"
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /api/v1/auth/login:
+    post:
+      tags:
+        - 인증/권한
+      summary: 사용자 로그인
+      description: |
+        username과 password로 로그인하여 JWT 토큰을 발급받습니다.
+        - **Access Token**: 응답 바디로 반환됩니다.
+        - **Refresh Token**: HttpOnly 쿠키(`refreshToken`)로 설정됩니다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: 로그인 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthTokenResponse"
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /api/v1/auth/refresh-token:
+    post:
+      tags:
+        - 인증/권한
+      summary: Access Token 갱신
+      description: |
+        HttpOnly Cookie의 Refresh Token으로 새 Access Token을 발급합니다.
+        Refresh Token Rotation(RTR) 적용 — 기존 Refresh Token은 즉시 무효화됩니다.
+        요청 바디 없음. 브라우저 쿠키(`refreshToken`)가 자동으로 전송됩니다.
+      responses:
+        "200":
+          description: 토큰 갱신 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthTokenResponse"
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /api/v1/auth/logout:
+    post:
+      tags:
+        - 인증/권한
+      summary: 로그아웃
+      description: Redis에서 Refresh Token을 삭제하고 Cookie를 만료시킵니다.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: 로그아웃 성공
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+
+  # ──────────────────────────────────────────────────────────────────
+  # MEMBERS (Protected) → jym-member-auth-service
+  # ──────────────────────────────────────────────────────────────────
+  /api/v1/members/me:
+    get:
+      tags:
+        - 회원
+      summary: 내 프로필 조회
+      description: |
+        현재 로그인한 사용자의 상세 정보를 조회합니다.
+        JWT 검증 후 게이트웨이가 `X-User-Name` 헤더를 다운스트림으로 주입합니다.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: 프로필 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemberProfile"
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+
+  # ──────────────────────────────────────────────────────────────────
+  # CATALOG (Public) → jym-catalog-service
+  # ──────────────────────────────────────────────────────────────────
+  /api/v1/products:
+    get:
+      tags:
+        - 상품/카탈로그
+      summary: 상품 목록 조회
+      description: 음반 상품 목록을 페이지네이션으로 조회합니다.
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: categoryId
+          in: query
+          schema:
+            type: integer
+          description: 카테고리 ID로 필터링
+      responses:
+        "200":
+          description: 상품 목록 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedProductResponse"
+        "500":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /api/v1/products/{productId}:
+    get:
+      tags:
+        - 상품/카탈로그
+      summary: 상품 단건 조회
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: 상품 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductResponse"
+        "404":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /api/v1/categories:
+    get:
+      tags:
+        - 상품/카탈로그
+      summary: 카테고리 목록 조회
+      description: 전체 카테고리 목록을 조회합니다.
+      responses:
+        "200":
+          description: 카테고리 목록 조회 성공
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CategoryResponse"
+        "500":
+          $ref: "#/components/responses/ErrorResponse"
+
+  # ──────────────────────────────────────────────────────────────────
+  # ORDERS (Protected) → jym-order-service
+  # ──────────────────────────────────────────────────────────────────
+  /api/v1/orders:
+    post:
+      tags:
+        - 주문
+      summary: 주문 생성
+      description: |
+        새로운 주문을 생성합니다.
+        게이트웨이가 `X-User-Id`, `X-User-Name`, `X-User-Role` 헤더를 주입합니다.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrderRequest"
+      responses:
+        "201":
+          description: 주문 생성 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderResponse"
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+    get:
+      tags:
+        - 주문
+      summary: 내 주문 목록 조회
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: 주문 목록 조회 성공
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OrderResponse"
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /api/v1/orders/{orderId}:
+    get:
+      tags:
+        - 주문
+      summary: 주문 단건 조회
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: 주문 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderResponse"
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+        "404":
+          $ref: "#/components/responses/ErrorResponse"
+
+  # ──────────────────────────────────────────────────────────────────
+  # PAYMENTS (Protected) → jym-payment-service
+  # ──────────────────────────────────────────────────────────────────
+  /api/v1/payments:
+    post:
+      tags:
+        - 결제
+      summary: 결제 요청
+      description: |
+        주문에 대한 결제를 처리합니다.
+        게이트웨이가 `X-User-Id`, `X-User-Name`, `X-User-Role` 헤더를 주입합니다.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PaymentRequest"
+      responses:
+        "200":
+          description: 결제 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentResponse"
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /api/v1/payments/{paymentId}:
+    get:
+      tags:
+        - 결제
+      summary: 결제 내역 단건 조회
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: paymentId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: 결제 내역 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentResponse"
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+        "404":
+          $ref: "#/components/responses/ErrorResponse"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        RS256 서명된 JWT Access Token.
+        게이트웨이에서 서명을 검증하고 클레임을 다운스트림 헤더로 주입합니다.
+        - `X-User-Id`: 사용자 내부 ID
+        - `X-User-Name`: 사용자 로그인명 (JWT subject)
+        - `X-User-Role`: 사용자 권한 (e.g. ROLE_USER, ROLE_ADMIN)
+
+  responses:
+    ErrorResponse:
+      description: GlobalExceptionHandler 기반의 공통 오류 응답
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  schemas:
+    # ── Auth ──
+    RegisterRequest:
+      type: object
+      required: [username, password, nickname]
+      properties:
+        username:
+          type: string
+          description: 사용자 로그인 아이디
+        password:
+          type: string
+          minLength: 4
+          description: 비밀번호 (최소 4자 이상)
+        nickname:
+          type: string
+          description: 서비스 내 표시 닉네임
+        email:
+          type: string
+          format: email
+          description: 사용자 이메일 주소
+
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+
+    AuthTokenResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+          description: RS256 서명된 JWT Access Token (유효기간 30분)
+        tokenType:
+          type: string
+          example: Bearer
+
+    # ── Member ──
+    MemberProfile:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: 사용자 고유 식별자
+        username:
+          type: string
+          description: 사용자 로그인 아이디
+        nickname:
+          type: string
+          description: 서비스 내 표시 닉네임
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [ROLE_ADMIN, ROLE_USER]
+          example: ROLE_USER
+
+    # ── Catalog ──
+    ProductResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+          description: 상품명 (앨범명)
+        price:
+          type: number
+          format: double
+        categoryId:
+          type: integer
+          format: int64
+        description:
+          type: string
+
+    PagedProductResponse:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProductResponse"
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+        page:
+          type: integer
+        size:
+          type: integer
+
+    CategoryResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+
+    # ── Order ──
+    CreateOrderRequest:
+      type: object
+      required: [productId, quantity]
+      properties:
+        productId:
+          type: integer
+          format: int64
+        quantity:
+          type: integer
+          minimum: 1
+
+    OrderResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        userId:
+          type: integer
+          format: int64
+        productId:
+          type: integer
+          format: int64
+        quantity:
+          type: integer
+        totalPrice:
+          type: number
+          format: double
+        status:
+          type: string
+          enum: [PENDING, CONFIRMED, CANCELLED]
+        createdAt:
+          type: string
+          format: date-time
+
+    # ── Payment ──
+    PaymentRequest:
+      type: object
+      required: [orderId, method]
+      properties:
+        orderId:
+          type: integer
+          format: int64
+        method:
+          type: string
+          enum: [CARD, BANK_TRANSFER]
+          description: 결제 수단
+
+    PaymentResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        orderId:
+          type: integer
+          format: int64
+        amount:
+          type: number
+          format: double
+        method:
+          type: string
+        status:
+          type: string
+          enum: [SUCCESS, FAILED, REFUNDED]
+        createdAt:
+          type: string
+          format: date-time
+
+    # ── Common ──
+    ErrorResponse:
+      type: object
+      properties:
+        status:
+          type: integer
+          description: HTTP 상태 코드
+        code:
+          type: string
+          description: 내부 정의 비즈니스 오류 코드
+        message:
+          type: string
+          description: 상세 오류 메시지
+        timestamp:
+          type: string
+          format: date-time

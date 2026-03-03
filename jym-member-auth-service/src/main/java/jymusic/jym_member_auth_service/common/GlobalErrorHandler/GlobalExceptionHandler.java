@@ -63,10 +63,10 @@ public class GlobalExceptionHandler {
 
     private Map<String, Object> createErrorResponse(String errorCode, String message, int status) {
         Map<String, Object> errorResponse = new HashMap<>();
-        errorResponse.put("errorCode", errorCode);
+        errorResponse.put("code", errorCode);
         errorResponse.put("message", message);
         errorResponse.put("status", status);
-        errorResponse.put("timestamp", LocalDateTime.now());
+        errorResponse.put("timestamp", LocalDateTime.now().toString());
         return errorResponse;
     }
 }

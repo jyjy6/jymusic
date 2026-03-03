@@ -8,6 +8,7 @@ import jymusic.jym_member_auth_service.dto.member.MemberLoginRequest;
 import jymusic.jym_member_auth_service.dto.member.MemberProfileResponse;
 import jymusic.jym_member_auth_service.dto.member.MemberRegistrationRequest;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -15,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Map;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -71,7 +73,37 @@ public class MemberService {
     public MemberProfileResponse getProfile(String username) {
         Member member = memberRepository.findByUsername(username)
                 .orElseThrow(() -> new GlobalException("사용자를 찾을 수 없습니다.", "ERR_MEMBER_NOT_FOUND", HttpStatus.NOT_FOUND));
-        
+
         return MemberProfileResponse.fromEntity(member);
+    }
+
+    @Transactional
+    public Map<String, String> refreshTokens(String refreshToken) {
+        // 1. 서명 검증 + username 추출 (위·변조 토큰은 여기서 GlobalException 발생)
+        String username = jwtProvider.extractUsername(refreshToken);
+
+        // 2. Redis 검증 + RTR: 새 Refresh Token 발급 (탈취 감지 시 GlobalException)
+        String newRefreshToken = jwtProvider.rotateRefreshToken(refreshToken, username);
+
+        // 3. 새 Access Token 발급 (DB 조회로 최신 role, nickname 반영)
+        Member member = memberRepository.findByUsername(username)
+                .orElseThrow(() -> new GlobalException("사용자를 찾을 수 없습니다.", "ERR_MEMBER_NOT_FOUND", HttpStatus.NOT_FOUND));
+
+        String newAccessToken = jwtProvider.createAccessToken(
+                member.getId(), member.getUsername(), member.getRole().name(), member.getNickname()
+        );
+
+        return Map.of("accessToken", newAccessToken, "refreshToken", newRefreshToken);
+    }
+
+    public void logout(String refreshToken) {
+        try {
+            String username = jwtProvider.extractUsername(refreshToken);
+            jwtProvider.deleteRefreshToken(username);
+            log.info("로그아웃 완료 - Redis Refresh Token 삭제: {}", username);
+        } catch (Exception e) {
+            // 이미 만료되었거나 유효하지 않은 토큰이어도 로그아웃은 정상 처리
+            log.warn("로그아웃 시 토큰 파싱 실패 (무시): {}", e.getMessage());
+        }
     }
 }
