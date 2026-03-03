@@ -1,0 +1,25 @@
+# ── Build Stage ──────────────────────────────────────────────────────────────
+FROM eclipse-temurin:21-jdk-alpine AS builder
+
+WORKDIR /app
+
+COPY gradlew .
+COPY gradle gradle
+COPY build.gradle settings.gradle ./
+
+# 의존성 다운로드를 별도 레이어로 캐싱
+RUN ./gradlew dependencies --no-daemon --quiet
+
+COPY src src
+RUN ./gradlew bootJar --no-daemon -x test
+
+# ── Run Stage ─────────────────────────────────────────────────────────────────
+FROM eclipse-temurin:21-jre-alpine
+
+WORKDIR /app
+
+COPY --from=builder /app/build/libs/*.jar app.jar
+
+EXPOSE 8081
+
+ENTRYPOINT ["java", "-jar", "app.jar"]

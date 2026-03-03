@@ -1,0 +1,127 @@
+services:
+
+  # ──────────────────────────────────────────
+  # Infrastructure
+  # ──────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: jym-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - jym-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ──────────────────────────────────────────
+  # Backend Services
+  # DB 설정은 각 서비스의 application-dev.properties 사용
+  # Redis만 Docker 내부 서비스명으로 오버라이드
+  # ──────────────────────────────────────────
+  jym-member-auth-service:
+    build:
+      context: ./jym-member-auth-service
+      dockerfile: Dockerfile.dev
+    container_name: jym-member-auth-service
+    restart: unless-stopped
+    environment:
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+    ports:
+      - "8081:8080"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - jym-network
+
+  jym-catalog-service:
+    build:
+      context: ./jym-catalog-service
+      dockerfile: Dockerfile.dev
+    container_name: jym-catalog-service
+    restart: unless-stopped
+    ports:
+      - "8082:8080"
+    networks:
+      - jym-network
+
+  jym-order-service:
+    build:
+      context: ./jym-order-service
+      dockerfile: Dockerfile.dev
+    container_name: jym-order-service
+    restart: unless-stopped
+    ports:
+      - "8083:8080"
+    networks:
+      - jym-network
+
+  jym-payment-service:
+    build:
+      context: ./jym-payment-service
+      dockerfile: Dockerfile.dev
+    container_name: jym-payment-service
+    restart: unless-stopped
+    ports:
+      - "8084:8080"
+    networks:
+      - jym-network
+
+  jym-api-gateway:
+    build:
+      context: ./jym-api-gateway
+      dockerfile: Dockerfile.dev
+    container_name: jym-api-gateway
+    restart: unless-stopped
+    environment:
+      SERVICES_MEMBER_AUTH_URL: http://jym-member-auth-service:8080
+      SERVICES_CATALOG_URL: http://jym-catalog-service:8080
+      SERVICES_ORDER_URL: http://jym-order-service:8080
+      SERVICES_PAYMENT_URL: http://jym-payment-service:8080
+    ports:
+      - "8080:8080"
+    depends_on:
+      - jym-member-auth-service
+      - jym-catalog-service
+      - jym-order-service
+      - jym-payment-service
+    networks:
+      - jym-network
+
+  # ──────────────────────────────────────────
+  # Frontend
+  # ──────────────────────────────────────────
+  jym-front:
+    build:
+      context: ./jym-front
+      dockerfile: Dockerfile.dev
+    container_name: jym-front
+    restart: unless-stopped
+    environment:
+      NUXT_PUBLIC_API_BASE_URL: http://localhost:8080
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./jym-front:/app
+      - /app/node_modules
+    depends_on:
+      - jym-api-gateway
+    networks:
+      - jym-network
+
+# ──────────────────────────────────────────
+# Volumes & Networks
+# ──────────────────────────────────────────
+volumes:
+  redis_data:
+
+networks:
+  jym-network:
+    driver: bridge
