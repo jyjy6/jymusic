@@ -30,6 +30,18 @@ The Jymusic project is a Music Album E-commerce platform built on a Microservice
 - **Coverage**: Maintain a minimum unit test coverage of **70%**.
 - **Integration Testing**: Deferred for now; focus on high-quality unit tests.
 
+### 2.3.1 Development & Testing Workflow
+① Write API Spec (OAS)
+        ↓
+② Implement Business Code
+        ↓
+③ Write Test Code
+   - Happy path cases
+   - Boundary value / Exception cases
+   - If gaps are found in the spec → patch spec & business code accordingly
+        ↓
+④ Tests act as a regression safety net for future changes
+
 ### 2.4 Spec-Driven Development (SDD)
 - All API changes start with an OpenAPI Specification (OAS 3.0/3.1).
 - Documentation is the source of truth.
