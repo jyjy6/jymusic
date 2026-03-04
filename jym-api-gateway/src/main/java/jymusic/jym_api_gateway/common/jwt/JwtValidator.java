@@ -28,7 +28,7 @@ public class JwtValidator {
         String pem = new String(keyBytes, StandardCharsets.UTF_8)
                 .replace("-----BEGIN PUBLIC KEY-----", "")
                 .replace("-----END PUBLIC KEY-----", "")
-                .replaceAll("\s", "")
+                .replaceAll("\\s", "")
                 .trim();
         byte[] decoded = Base64.getDecoder().decode(pem);
         X509EncodedKeySpec spec = new X509EncodedKeySpec(decoded);
