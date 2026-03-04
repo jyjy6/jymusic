@@ -1,3 +1,5 @@
+############## Complete #################
+
 # 03_JWT_DESIGN (Authentication Strategy)
 
 ## 1. Overview

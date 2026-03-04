@@ -1,3 +1,5 @@
+############## Complete #################
+
 # 01_TABLE_DESIGN (Member & Auth Service)
 
 ## 1. Overview
