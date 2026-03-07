@@ -28,6 +28,8 @@ http://localhost:8080  ←  jym-api-gateway
 | `/auth/register` | 회원가입 | 불필요 | POST `/api/v1/auth/register` |
 | `/auth/login` | 로그인 | 불필요 | POST `/api/v1/auth/login` |
 | `/me` | 내 프로필 | **필요** | GET `/api/v1/members/me` |
+| `/products` | 상품 목록 | 불필요 | GET `/api/v1/products`, GET `/api/v1/categories` |
+| `/products/[id]` | 상품 상세 | 불필요 | GET `/api/v1/products/{id}` |
 
 ## 4. 인증 흐름
 
