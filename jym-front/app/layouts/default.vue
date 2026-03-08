@@ -1,5 +1,6 @@
 <template>
   <div class="min-h-screen bg-gray-50">
+    <AppToast />
     <nav class="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-50">
       <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between items-center h-16">
@@ -13,6 +14,12 @@
 
           <!-- 네비게이션 -->
           <div class="flex items-center gap-3">
+            <NuxtLink
+              to="/products"
+              class="text-sm text-gray-600 hover:text-indigo-600 font-medium transition-colors px-2 py-1 rounded-md hover:bg-indigo-50"
+            >
+              상품
+            </NuxtLink>
             <template v-if="authStore.isLoggedIn">
               <span class="text-sm text-gray-500 hidden sm:block">
                 <span class="font-semibold text-gray-800">{{ authStore.user?.nickname }}</span> 님
@@ -58,6 +65,7 @@
 
 <script setup lang="ts">
 import type { AxiosInstance } from 'axios'
+import AppToast from '~/components/AppToast.vue'
 import { useAuthStore } from '~/stores/auth'
 
 const authStore = useAuthStore()

@@ -13,10 +13,16 @@
         </p>
 
         <div class="flex flex-col sm:flex-row gap-4 justify-center">
+          <NuxtLink
+            to="/products"
+            class="inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-white text-indigo-700 font-semibold rounded-xl hover:bg-indigo-50 transition-colors shadow-lg"
+          >
+            <span>💿</span> 상품 둘러보기
+          </NuxtLink>
           <template v-if="authStore.isLoggedIn">
             <NuxtLink
               to="/me"
-              class="inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-white text-indigo-700 font-semibold rounded-xl hover:bg-indigo-50 transition-colors shadow-lg"
+              class="inline-flex items-center justify-center gap-2 px-8 py-3.5 border border-white/30 text-white font-semibold rounded-xl hover:bg-white/10 transition-colors"
             >
               <span>👤</span> 내 프로필 보기
             </NuxtLink>
