@@ -30,6 +30,8 @@ http://localhost:8080  ←  jym-api-gateway
 | `/me` | マイプロフィール | **必要** | GET `/api/v1/members/me` | `01_PAGES_AUTH_JP.md` |
 | `/products` | 商品一覧 | 不要 | GET `/api/v1/products`, GET `/api/v1/categories` | `02_PAGES_CATALOG_JP.md` |
 | `/products/[id]` | 商品詳細 | 不要 | GET `/api/v1/products/{id}` | `02_PAGES_CATALOG_JP.md` |
+| `/admin/products/new` | 商品登録 | **ROLE_ADMIN** | POST `/api/v1/products` | `03_PAGES_CATALOG_ADMIN_JP.md` |
+| `/admin/products/[id]/edit` | 商品編集 | **ROLE_ADMIN** | PUT `/api/v1/products/{id}` | `03_PAGES_CATALOG_ADMIN_JP.md` |
 
 ## 4. スペックファイル構成
 
@@ -37,6 +39,7 @@ http://localhost:8080  ←  jym-api-gateway
 |---|---|
 | `01_PAGES_AUTH_JP.md` | メイン、会員登録、ログイン、マイプロフィール、Axios/Pinia/ミドルウェア共通設定 |
 | `02_PAGES_CATALOG_JP.md` | 商品一覧、商品詳細、カタログ型/コンポーザブル/コンポーネント |
+| `03_PAGES_CATALOG_ADMIN_JP.md` | 商品登録/編集、Presigned URLアップロード、FileUploadコンポーネント、管理者ミドルウェア |
 
 ## 5. 認証フロー
 

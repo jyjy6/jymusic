@@ -30,6 +30,8 @@ The frontend must never know the port of any downstream service (member-auth, ca
 | `/me` | My Profile | **Yes** | GET `/api/v1/members/me` | `01_PAGES_AUTH_EN.md` |
 | `/products` | Product List | No | GET `/api/v1/products`, GET `/api/v1/categories` | `02_PAGES_CATALOG_EN.md` |
 | `/products/[id]` | Product Detail | No | GET `/api/v1/products/{id}` | `02_PAGES_CATALOG_EN.md` |
+| `/admin/products/new` | Add Product | **ROLE_ADMIN** | POST `/api/v1/products` | `03_PAGES_CATALOG_ADMIN_EN.md` |
+| `/admin/products/[id]/edit` | Edit Product | **ROLE_ADMIN** | PUT `/api/v1/products/{id}` | `03_PAGES_CATALOG_ADMIN_EN.md` |
 
 ## 4. Spec File Structure
 
@@ -37,6 +39,7 @@ The frontend must never know the port of any downstream service (member-auth, ca
 |---|---|
 | `01_PAGES_AUTH_EN.md` | Main, Register, Login, My Profile, Axios/Pinia/middleware common setup |
 | `02_PAGES_CATALOG_EN.md` | Product list, Product detail, catalog types/composables/components |
+| `03_PAGES_CATALOG_ADMIN_EN.md` | Product create/edit, Presigned URL upload, FileUpload component, admin middleware |
 
 ## 5. Auth Flow
 

@@ -24,5 +24,37 @@ export interface ProductDetail {
   description: string
   price: number
   stockQuantity: number
+  categoryId: number
+  imageKey?: string | null
   imageUrl: string | null
+}
+
+export interface ProductCreateRequest {
+  title: string
+  artist: string
+  description: string
+  price: number
+  stockQuantity: number
+  categoryId: number
+  imageKey: string | null
+}
+
+export interface ProductUpdateRequest {
+  title: string
+  artist: string
+  description: string
+  price: number
+  stockQuantity: number
+  categoryId: number
+  imageKey: string | null
+}
+
+export interface PresignedUrlRequest {
+  filename: string
+  contentType: string
+}
+
+export interface PresignedUrlResponse {
+  presignedUrl: string
+  objectKey: string
 }
