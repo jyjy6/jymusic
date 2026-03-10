@@ -22,14 +22,26 @@ The frontend must never know the port of any downstream service (member-auth, ca
 
 ## 3. Page List
 
-| Path | Page | Auth Required | Purpose |
-|---|---|---|---|
-| `/` | Main (Home) | No | Service intro, navigation |
-| `/auth/register` | Register | No | POST `/api/v1/auth/register` |
-| `/auth/login` | Login | No | POST `/api/v1/auth/login` |
-| `/me` | My Profile | **Yes** | GET `/api/v1/members/me` |
+| Path | Page | Auth Required | Purpose | Spec File |
+|---|---|---|---|---|
+| `/` | Main (Home) | No | Service intro, navigation | `01_PAGES_AUTH_EN.md` |
+| `/auth/register` | Register | No | POST `/api/v1/auth/register` | `01_PAGES_AUTH_EN.md` |
+| `/auth/login` | Login | No | POST `/api/v1/auth/login` | `01_PAGES_AUTH_EN.md` |
+| `/me` | My Profile | **Yes** | GET `/api/v1/members/me` | `01_PAGES_AUTH_EN.md` |
+| `/products` | Product List | No | GET `/api/v1/products`, GET `/api/v1/categories` | `02_PAGES_CATALOG_EN.md` |
+| `/products/[id]` | Product Detail | No | GET `/api/v1/products/{id}` | `02_PAGES_CATALOG_EN.md` |
+| `/admin/products/new` | Add Product | **ROLE_ADMIN** | POST `/api/v1/products` | `03_PAGES_CATALOG_ADMIN_EN.md` |
+| `/admin/products/[id]/edit` | Edit Product | **ROLE_ADMIN** | PUT `/api/v1/products/{id}` | `03_PAGES_CATALOG_ADMIN_EN.md` |
 
-## 4. Auth Flow
+## 4. Spec File Structure
+
+| File | Domain |
+|---|---|
+| `01_PAGES_AUTH_EN.md` | Main, Register, Login, My Profile, Axios/Pinia/middleware common setup |
+| `02_PAGES_CATALOG_EN.md` | Product list, Product detail, catalog types/composables/components |
+| `03_PAGES_CATALOG_ADMIN_EN.md` | Product create/edit, Presigned URL upload, FileUpload component, admin middleware |
+
+## 5. Auth Flow
 
 ```
 [Login Success]
@@ -43,13 +55,13 @@ The frontend must never know the port of any downstream service (member-auth, ca
   → Axios interceptor auto-injects Authorization: Bearer <token>
 ```
 
-## 5. Layout
+## 6. Layout
 
 - **Common Layout** (`layouts/default.vue`): includes top navigation bar
   - Logged in: display username + logout button
   - Not logged in: login / register links
 
-## 6. Error Handling
+## 7. Error Handling
 
 - API response `401` → treated as Access Token expiry → redirect to login page
 - API response `400` / `409` etc. → inline error message below the relevant form

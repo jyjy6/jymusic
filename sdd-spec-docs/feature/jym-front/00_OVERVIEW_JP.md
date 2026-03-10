@@ -22,14 +22,26 @@ http://localhost:8080  ←  jym-api-gateway
 
 ## 3. ページ一覧
 
-| パス | ページ | 認証必要 | 目的 |
-|---|---|---|---|
-| `/` | メイン（ホーム） | 不要 | サービス紹介、ナビゲーション |
-| `/auth/register` | 会員登録 | 不要 | POST `/api/v1/auth/register` |
-| `/auth/login` | ログイン | 不要 | POST `/api/v1/auth/login` |
-| `/me` | マイプロフィール | **必要** | GET `/api/v1/members/me` |
+| パス | ページ | 認証必要 | 目的 | 詳細スペックファイル |
+|---|---|---|---|---|
+| `/` | メイン（ホーム） | 不要 | サービス紹介、ナビゲーション | `01_PAGES_AUTH_JP.md` |
+| `/auth/register` | 会員登録 | 不要 | POST `/api/v1/auth/register` | `01_PAGES_AUTH_JP.md` |
+| `/auth/login` | ログイン | 不要 | POST `/api/v1/auth/login` | `01_PAGES_AUTH_JP.md` |
+| `/me` | マイプロフィール | **必要** | GET `/api/v1/members/me` | `01_PAGES_AUTH_JP.md` |
+| `/products` | 商品一覧 | 不要 | GET `/api/v1/products`, GET `/api/v1/categories` | `02_PAGES_CATALOG_JP.md` |
+| `/products/[id]` | 商品詳細 | 不要 | GET `/api/v1/products/{id}` | `02_PAGES_CATALOG_JP.md` |
+| `/admin/products/new` | 商品登録 | **ROLE_ADMIN** | POST `/api/v1/products` | `03_PAGES_CATALOG_ADMIN_JP.md` |
+| `/admin/products/[id]/edit` | 商品編集 | **ROLE_ADMIN** | PUT `/api/v1/products/{id}` | `03_PAGES_CATALOG_ADMIN_JP.md` |
 
-## 4. 認証フロー
+## 4. スペックファイル構成
+
+| ファイル | 対象ドメイン |
+|---|---|
+| `01_PAGES_AUTH_JP.md` | メイン、会員登録、ログイン、マイプロフィール、Axios/Pinia/ミドルウェア共通設定 |
+| `02_PAGES_CATALOG_JP.md` | 商品一覧、商品詳細、カタログ型/コンポーザブル/コンポーネント |
+| `03_PAGES_CATALOG_ADMIN_JP.md` | 商品登録/編集、Presigned URLアップロード、FileUploadコンポーネント、管理者ミドルウェア |
+
+## 5. 認証フロー
 
 ```
 [ログイン成功]
@@ -43,13 +55,13 @@ http://localhost:8080  ←  jym-api-gateway
   → Axiosインターセプターが Authorization: Bearer <token> を自動注入
 ```
 
-## 5. レイアウト
+## 6. レイアウト
 
 - **共通レイアウト** (`layouts/default.vue`): トップナビゲーションバーを含む
   - ログイン状態: ユーザー名表示 + ログアウトボタン
   - 未ログイン状態: ログイン / 会員登録リンク
 
-## 6. エラーハンドリング
+## 7. エラーハンドリング
 
 - APIレスポンス `401` → アクセストークン期限切れとみなす → ログインページにリダイレクト
 - APIレスポンス `400` / `409` など → 該当フォーム下部にエラーメッセージをインライン表示

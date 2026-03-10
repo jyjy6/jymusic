@@ -1,4 +1,6 @@
-# jym-front: 페이지별 상세 설계
+# jym-front: 인증 관련 페이지 상세 설계
+
+> **포함 도메인**: 메인(홈), 회원가입, 로그인, 내 프로필, 인증 공통 컴포넌트/유틸
 
 ---
 
@@ -120,18 +122,24 @@ POST /api/v1/auth/logout  (Bearer 헤더 + 쿠키 자동 전송)
 
 ## 5. 공통 컴포넌트 / 유틸
 
-### `stores/auth.ts` (Pinia)
-```
-// Composition API 스타일 (Options API 금지)
-const accessToken = ref<string | null>(null)
-const user = ref<AuthUser | null>(null)
+### `stores/auth.ts` (Pinia) — 최신 정의
+```typescript
+export const useAuthStore = defineStore('auth', () => {
+  const accessToken = ref<string | null>(null)
+  const user = ref<AuthUser | null>(null)
 
-const isLoggedIn = computed(() => accessToken.value !== null)
+  const isLoggedIn = computed(() => accessToken.value !== null)
 
-const setAuth(token, authUser)  → 로그인 성공 시 호출
-const setToken(token)           → 토큰 갱신 성공 시 호출
-const clearAuth()               → 로그아웃 / 갱신 실패 시 호출
+  const setAuth = (token: string, authUser: AuthUser) => { ... }
+  const setToken = (token: string) => { ... }
+  const clearAuth = () => { ... }
+
+  return { accessToken, user, isLoggedIn, setAuth, setToken, clearAuth }
+})
 ```
+> **헌법 준수**: `<script setup lang="ts">` 기반 Composition API 스타일. Options API(`state`, `getters`, `actions` 객체) 사용 금지.
+
+---
 
 ### `plugins/axios.ts`
 
@@ -163,25 +171,6 @@ const clearAuth()               → 로그아웃 / 갱신 실패 시 호출
 **axios 전역 설정**
 - `baseURL`: `http://localhost:8080`
 - `withCredentials: true` (Refresh Token Cookie 자동 전송)
-
----
-
-### `stores/auth.ts` (Pinia) — 최신 정의
-```typescript
-export const useAuthStore = defineStore('auth', () => {
-  const accessToken = ref<string | null>(null)
-  const user = ref<AuthUser | null>(null)
-
-  const isLoggedIn = computed(() => accessToken.value !== null)
-
-  const setAuth = (token: string, authUser: AuthUser) => { ... }
-  const setToken = (token: string) => { ... }
-  const clearAuth = () => { ... }
-
-  return { accessToken, user, isLoggedIn, setAuth, setToken, clearAuth }
-})
-```
-> **헌법 준수**: `<script setup lang="ts">` 기반 Composition API 스타일. Options API(`state`, `getters`, `actions` 객체) 사용 금지.
 
 ---
 

@@ -22,14 +22,26 @@ http://localhost:8080  ←  jym-api-gateway
 
 ## 3. 페이지 목록
 
-| 경로 | 페이지 | 인증 필요 | 목적 |
-|---|---|---|---|
-| `/` | 메인(홈) | 불필요 | 서비스 소개, 네비게이션 |
-| `/auth/register` | 회원가입 | 불필요 | POST `/api/v1/auth/register` |
-| `/auth/login` | 로그인 | 불필요 | POST `/api/v1/auth/login` |
-| `/me` | 내 프로필 | **필요** | GET `/api/v1/members/me` |
+| 경로 | 페이지 | 인증 필요 | 목적 | 상세 스펙 |
+|---|---|---|---|---|
+| `/` | 메인(홈) | 불필요 | 서비스 소개, 네비게이션 | `01_PAGES_AUTH_KR.md` |
+| `/auth/register` | 회원가입 | 불필요 | POST `/api/v1/auth/register` | `01_PAGES_AUTH_KR.md` |
+| `/auth/login` | 로그인 | 불필요 | POST `/api/v1/auth/login` | `01_PAGES_AUTH_KR.md` |
+| `/me` | 내 프로필 | **필요** | GET `/api/v1/members/me` | `01_PAGES_AUTH_KR.md` |
+| `/products` | 상품 목록 | 불필요 | GET `/api/v1/products`, GET `/api/v1/categories` | `02_PAGES_CATALOG_KR.md` |
+| `/products/[id]` | 상품 상세 | 불필요 | GET `/api/v1/products/{id}` | `02_PAGES_CATALOG_KR.md` |
+| `/admin/products/new` | 상품 등록 | **ROLE_ADMIN** | POST `/api/v1/products` | `03_PAGES_CATALOG_ADMIN_KR.md` |
+| `/admin/products/[id]/edit` | 상품 수정 | **ROLE_ADMIN** | PUT `/api/v1/products/{id}` | `03_PAGES_CATALOG_ADMIN_KR.md` |
 
-## 4. 인증 흐름
+## 4. 스펙 파일 구조
+
+| 파일 | 포함 도메인 |
+|---|---|
+| `01_PAGES_AUTH_KR.md` | 메인, 회원가입, 로그인, 내 프로필, Axios/Pinia/미들웨어 공통 설정 |
+| `02_PAGES_CATALOG_KR.md` | 상품 목록, 상품 상세, 카탈로그 타입/컴포저블/컴포넌트 |
+| `03_PAGES_CATALOG_ADMIN_KR.md` | 상품 등록/수정, Presigned URL 업로드, FileUpload 컴포넌트, 관리자 미들웨어 |
+
+## 5. 인증 흐름
 
 ```
 [로그인 성공]
@@ -43,13 +55,13 @@ http://localhost:8080  ←  jym-api-gateway
   → Axios 인터셉터가 Authorization: Bearer <token> 자동 주입
 ```
 
-## 5. 레이아웃
+## 6. 레이아웃
 
 - **공통 레이아웃** (`layouts/default.vue`): 상단 네비게이션 바 포함
   - 로그인 상태: 사용자명 표시 + 로그아웃 버튼
   - 비로그인 상태: 로그인 / 회원가입 링크
 
-## 6. 에러 처리
+## 7. 에러 처리
 
 - API 응답 `401` → Access Token 만료로 간주 → 로그인 페이지 리다이렉트
 - API 응답 `400` / `409` 등 → 해당 폼 하단에 에러 메시지 인라인 표시

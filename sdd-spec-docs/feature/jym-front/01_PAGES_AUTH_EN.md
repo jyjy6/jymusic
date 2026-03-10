@@ -1,4 +1,6 @@
-# jym-front: Detailed Page Design
+# jym-front: Auth Pages — Detailed Design
+
+> **Domain**: Main (Home), Register, Login, My Profile, Auth common components/utilities
 
 ---
 
@@ -120,6 +122,25 @@ POST /api/v1/auth/logout  (Bearer header + cookie auto-sent)
 
 ## 5. Common Components / Utilities
 
+### `stores/auth.ts` (Pinia) — Current Definition
+```typescript
+export const useAuthStore = defineStore('auth', () => {
+  const accessToken = ref<string | null>(null)
+  const user = ref<AuthUser | null>(null)
+
+  const isLoggedIn = computed(() => accessToken.value !== null)
+
+  const setAuth = (token: string, authUser: AuthUser) => { ... }
+  const setToken = (token: string) => { ... }
+  const clearAuth = () => { ... }
+
+  return { accessToken, user, isLoggedIn, setAuth, setToken, clearAuth }
+})
+```
+> **Architecture compliance**: Composition API style required. Options API (`state`, `getters`, `actions` objects) is prohibited.
+
+---
+
 ### `plugins/axios.ts`
 
 **Request Interceptor**
@@ -150,25 +171,6 @@ Module-level variables for preventing duplicate refreshes:
 **Axios Global Settings**
 - `baseURL`: `http://localhost:8080`
 - `withCredentials: true` (auto-send Refresh Token Cookie)
-
----
-
-### `stores/auth.ts` (Pinia) — Current Definition
-```typescript
-export const useAuthStore = defineStore('auth', () => {
-  const accessToken = ref<string | null>(null)
-  const user = ref<AuthUser | null>(null)
-
-  const isLoggedIn = computed(() => accessToken.value !== null)
-
-  const setAuth = (token: string, authUser: AuthUser) => { ... }
-  const setToken = (token: string) => { ... }
-  const clearAuth = () => { ... }
-
-  return { accessToken, user, isLoggedIn, setAuth, setToken, clearAuth }
-})
-```
-> **Architecture compliance**: Composition API style required. Options API (`state`, `getters`, `actions` objects) is prohibited.
 
 ---
 

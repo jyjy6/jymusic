@@ -1,4 +1,6 @@
-# jym-front: ページ詳細設計
+# jym-front: 認証関連ページ詳細設計
+
+> **対象ドメイン**: メイン（ホーム）、会員登録、ログイン、マイプロフィール、認証共通コンポーネント/ユーティリティ
 
 ---
 
@@ -120,6 +122,25 @@ POST /api/v1/auth/logout  (Bearerヘッダー + Cookie自動送信)
 
 ## 5. 共通コンポーネント / ユーティリティ
 
+### `stores/auth.ts`（Pinia）— 現在の定義
+```typescript
+export const useAuthStore = defineStore('auth', () => {
+  const accessToken = ref<string | null>(null)
+  const user = ref<AuthUser | null>(null)
+
+  const isLoggedIn = computed(() => accessToken.value !== null)
+
+  const setAuth = (token: string, authUser: AuthUser) => { ... }
+  const setToken = (token: string) => { ... }
+  const clearAuth = () => { ... }
+
+  return { accessToken, user, isLoggedIn, setAuth, setToken, clearAuth }
+})
+```
+> **アーキテクチャ準拠**: Composition APIスタイル必須。Options API（`state`、`getters`、`actions`オブジェクト）の使用禁止。
+
+---
+
 ### `plugins/axios.ts`
 
 **リクエストインターセプター**
@@ -150,25 +171,6 @@ POST /api/v1/auth/logout  (Bearerヘッダー + Cookie自動送信)
 **axios全体設定**
 - `baseURL`: `http://localhost:8080`
 - `withCredentials: true`（リフレッシュトークンCookieを自動送信）
-
----
-
-### `stores/auth.ts`（Pinia）— 現在の定義
-```typescript
-export const useAuthStore = defineStore('auth', () => {
-  const accessToken = ref<string | null>(null)
-  const user = ref<AuthUser | null>(null)
-
-  const isLoggedIn = computed(() => accessToken.value !== null)
-
-  const setAuth = (token: string, authUser: AuthUser) => { ... }
-  const setToken = (token: string) => { ... }
-  const clearAuth = () => { ... }
-
-  return { accessToken, user, isLoggedIn, setAuth, setToken, clearAuth }
-})
-```
-> **アーキテクチャ準拠**: Composition APIスタイル必須。Options API（`state`、`getters`、`actions`オブジェクト）の使用禁止。
 
 ---
 
