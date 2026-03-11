@@ -47,6 +47,7 @@ public class GatewayRoutingConfig {
         return route("catalog_service")
                 .route(path("/api/v1/products/**"), http())
                 .route(path("/api/v1/categories/**"), http())
+                .route(path("/api/v1/media/**"), http())
                 .before(uri(catalogUrl))
                 .build();
     }

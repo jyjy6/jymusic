@@ -1,20 +1,16 @@
 <template>
-  <NuxtLayout :name="adminLayoutName">
-    <ProductAdminForm
-      mode="edit"
-      :product-id="productId"
-    />
-  </NuxtLayout>
+  <ProductAdminForm
+    mode="edit"
+    :product-id="productId"
+  />
 </template>
 
 <script setup lang="ts">
 import ProductAdminForm from '~/components/products/ProductAdminForm.vue'
 import adminMiddleware from '~/middleware/admin'
 
-// Generated Nuxt layout types are stale until prepare/build refreshes them.
-const adminLayoutName = 'admin' as unknown as 'default'
-
 definePageMeta({
+  layout: 'admin',
   middleware: [adminMiddleware],
 })
 

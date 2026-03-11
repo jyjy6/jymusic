@@ -23,10 +23,10 @@ public class MediaService {
 
     private final S3Presigner s3Presigner;
 
-    @Value("${cloud.aws.s3.bucket}")
+    @Value("${spring.cloud.aws.s3.bucket}")
     private String bucketName;
 
-    @Value("${cloud.aws.s3.presigned-url-expiry-minutes:10}")
+    @Value("${spring.cloud.aws.s3.presigned-url-expiry-minutes:10}")
     private long expiryMinutes;
 
     public PresignedUrlResponse generatePresignedUrl(PresignedUrlRequest request) {

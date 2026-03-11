@@ -27,7 +27,7 @@ public class ProductService {
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
 
-    @Value("${cloud.aws.s3.base-url}")
+    @Value("${spring.cloud.aws.s3.base-url}")
     private String s3BaseUrl;
 
     public ProductListResponse getProducts(int page, int size, Long categoryId) {

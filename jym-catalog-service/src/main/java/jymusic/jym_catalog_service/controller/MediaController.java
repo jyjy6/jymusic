@@ -20,7 +20,6 @@ public class MediaController {
     private final MediaService mediaService;
 
     @PostMapping("/presigned-url")
-    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<PresignedUrlResponse> getPresignedUrl(
             @Valid @RequestBody PresignedUrlRequest request) {
         return ResponseEntity.ok(mediaService.generatePresignedUrl(request));
