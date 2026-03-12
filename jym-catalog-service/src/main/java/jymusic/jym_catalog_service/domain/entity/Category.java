@@ -18,4 +18,8 @@ public class Category extends BaseTimeEntity {
 
     @Column(nullable = false, unique = true, length = 50)
     private String name;
+
+    public void update(String name) {
+        this.name = name;
+    }
 }

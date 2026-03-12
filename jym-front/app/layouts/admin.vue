@@ -61,6 +61,12 @@
           >
             Add Product
           </NuxtLink>
+          <NuxtLink
+            to="/admin/categories"
+            :class="getTabClass('categories')"
+          >
+            Categories
+          </NuxtLink>
         </div>
       </div>
     </nav>
@@ -94,12 +100,16 @@ const handleLogout = async () => {
   }
 }
 
-const getTabClass = (type: 'products' | 'new') => {
+const getTabClass = (type: 'products' | 'new' | 'categories') => {
   const isNewPage = route.path === '/admin/products/new'
+  const isCategoriesPage = route.path.startsWith('/admin/categories')
   const isProductsPage = route.path === '/admin/products'
     || (route.path.startsWith('/admin/products/') && route.path.endsWith('/edit'))
 
-  const isActive = type === 'new' ? isNewPage : isProductsPage
+  let isActive = false
+  if (type === 'new') isActive = isNewPage
+  else if (type === 'categories') isActive = isCategoriesPage
+  else isActive = isProductsPage
 
   return [
     'inline-flex h-11 items-center border-b-2 text-sm font-semibold transition-colors',

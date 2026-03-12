@@ -6,7 +6,7 @@ info:
 
     **인증 방식**: API Gateway가 JWT를 검증하고 `X-User-Id`, `X-User-Role` 헤더를 주입합니다.
     관리자 API는 `Authorization: Bearer <token>` 헤더가 필요합니다.
-  version: 1.1.0
+  version: 1.2.0
 
 servers:
   - url: /api/v1
@@ -19,8 +19,10 @@ tags:
     description: 인증 없이 접근 가능한 상품 조회 API
   - name: 상품 (관리자)
     description: ROLE_ADMIN 권한 필요
-  - name: 카테고리
-    description: 카테고리 조회 API
+  - name: 카테고리 (공개)
+    description: 인증 없이 접근 가능한 카테고리 조회 API
+  - name: 카테고리 (관리자)
+    description: ROLE_ADMIN 권한 필요 — 카테고리 생성/수정/삭제
   - name: 미디어
     description: S3 Presigned URL 발급 (ROLE_ADMIN)
 
@@ -183,7 +185,7 @@ paths:
   /categories:
     get:
       tags:
-        - 카테고리
+        - 카테고리 (공개)
       summary: 모든 상품 카테고리 조회
       description: 음악 장르 및 상품 카테고리 목록 전체를 조회합니다.
       responses:
@@ -202,6 +204,105 @@ paths:
                   name: "Pop"
                 - id: 3
                   name: "Jazz"
+
+    post:
+      tags:
+        - 카테고리 (관리자)
+      summary: 카테고리 생성
+      description: 새로운 카테고리를 생성합니다. `ROLE_ADMIN` 권한이 필요합니다. 동일 이름의 카테고리가 이미 존재하면 409를 반환합니다.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CategoryCreateRequest'
+            example:
+              name: "Classical"
+      responses:
+        '201':
+          description: 카테고리 생성 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoryResponse'
+              example:
+                id: 4
+                name: "Classical"
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          description: 이미 존재하는 카테고리 이름
+          $ref: '#/components/responses/ErrorResponse'
+
+  /categories/{categoryId}:
+    put:
+      tags:
+        - 카테고리 (관리자)
+      summary: 카테고리 수정
+      description: 기존 카테고리의 이름을 수정합니다. `ROLE_ADMIN` 권한이 필요합니다. 다른 카테고리와 이름이 중복되면 409를 반환합니다.
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CategoryId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CategoryUpdateRequest'
+            example:
+              name: "Classical Music"
+      responses:
+        '200':
+          description: 카테고리 수정 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoryResponse'
+              example:
+                id: 4
+                name: "Classical Music"
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          description: 카테고리를 찾을 수 없음
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          description: 이미 존재하는 카테고리 이름
+          $ref: '#/components/responses/ErrorResponse'
+
+    delete:
+      tags:
+        - 카테고리 (관리자)
+      summary: 카테고리 삭제
+      description: |
+        카테고리를 물리적으로 삭제합니다. `ROLE_ADMIN` 권한이 필요합니다.
+        해당 카테고리에 연결된 상품이 존재하더라도 삭제가 가능하나,
+        삭제 후 연결된 상품의 `category_id`는 `NULL`이 됩니다 (DB FK 설정에 따름).
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CategoryId'
+      responses:
+        '204':
+          description: 카테고리 삭제 성공 (응답 본문 없음)
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          description: 카테고리를 찾을 수 없음
+          $ref: '#/components/responses/ErrorResponse'
 
   /media/presigned-url:
     post:
@@ -261,6 +362,15 @@ components:
       in: path
       required: true
       description: 상품의 고유 ID
+      schema:
+        type: integer
+        format: int64
+
+    CategoryId:
+      name: categoryId
+      in: path
+      required: true
+      description: 카테고리의 고유 ID
       schema:
         type: integer
         format: int64
@@ -366,6 +476,28 @@ components:
             변경 없으면 기존 objectKey 그대로 전송.
             이미지 삭제 시 `null` 전송.
           example: "products/uuid-abbey-road-remastered.jpg"
+
+    CategoryCreateRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: 카테고리 이름 (고유값, 최대 50자)
+          maxLength: 50
+          example: "Classical"
+
+    CategoryUpdateRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: 변경할 카테고리 이름 (고유값, 최대 50자)
+          maxLength: 50
+          example: "Classical Music"
 
     PresignedUrlRequest:
       type: object
