@@ -21,6 +21,13 @@
               상품
             </NuxtLink>
             <template v-if="authStore.isLoggedIn">
+              <NuxtLink
+                v-if="authStore.user?.role === 'ROLE_ADMIN'"
+                to="/admin/products"
+                class="text-sm text-gray-600 hover:text-indigo-600 font-medium transition-colors px-2 py-1 rounded-md hover:bg-indigo-50"
+              >
+                관리
+              </NuxtLink>
               <span class="text-sm text-gray-500 hidden sm:block">
                 <span class="font-semibold text-gray-800">{{ authStore.user?.nickname }}</span> 님
               </span>
