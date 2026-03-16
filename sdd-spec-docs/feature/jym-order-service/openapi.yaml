@@ -1,13 +1,132 @@
 openapi: 3.0.1
 info:
   title: Jymusic 주문 서비스 API
-  description: 새로운 주문 생성, 주문 내역 조회 및 상태 관리를 위한 API 명세입니다.
-  version: 1.0.0
+  description: 장바구니 관리, 주문 생성, 주문 내역 조회 및 상태 관리를 위한 API 명세입니다.
+  version: 2.0.0
 servers:
   - url: /api/v1
     description: API 게이트웨이 경로
 
 paths:
+  # ─────────────────────────────────────────
+  # 장바구니 (Cart)
+  # ─────────────────────────────────────────
+  /cart:
+    get:
+      tags:
+        - 장바구니
+      summary: 내 장바구니 조회
+      description: 현재 로그인한 사용자의 장바구니와 담긴 상품 목록을 조회합니다. 장바구니가 없으면 빈 목록을 반환합니다.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 장바구니 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+
+    delete:
+      tags:
+        - 장바구니
+      summary: 장바구니 전체 비우기
+      description: 현재 로그인한 사용자의 장바구니에 담긴 모든 상품을 삭제합니다.
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: 장바구니 비우기 성공
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /cart/items:
+    post:
+      tags:
+        - 장바구니
+      summary: 장바구니에 상품 추가
+      description: |
+        상품을 장바구니에 추가합니다.
+        동일 상품이 이미 존재하면 수량을 누적합니다 (UPSERT).
+        장바구니가 없으면 자동 생성합니다.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddToCartRequest'
+      responses:
+        '200':
+          description: 상품 추가 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /cart/items/{cartItemId}:
+    put:
+      tags:
+        - 장바구니
+      summary: 장바구니 아이템 수량 변경
+      description: 특정 아이템의 수량을 변경합니다. 수량이 0이면 해당 아이템을 삭제합니다.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: cartItemId
+          in: path
+          required: true
+          description: 수량을 변경할 장바구니 아이템 ID
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCartItemRequest'
+      responses:
+        '200':
+          description: 수량 변경 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+    delete:
+      tags:
+        - 장바구니
+      summary: 장바구니 특정 아이템 삭제
+      description: 장바구니에서 특정 아이템을 삭제합니다.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: cartItemId
+          in: path
+          required: true
+          description: 삭제할 장바구니 아이템 ID
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: 아이템 삭제 성공
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  # ─────────────────────────────────────────
+  # 주문 (Order)
+  # ─────────────────────────────────────────
   /orders:
     post:
       tags:
@@ -90,6 +209,67 @@ components:
             $ref: '#/components/schemas/ErrorResponse'
 
   schemas:
+    # ── 장바구니 스키마 ──
+    CartItem:
+      type: object
+      properties:
+        cartItemId:
+          type: integer
+          description: 장바구니 아이템 고유 ID
+        productId:
+          type: integer
+          description: 상품 ID
+        title:
+          type: string
+          description: 상품명 (앨범 제목)
+        artist:
+          type: string
+          description: 아티스트명
+        thumbnailUrl:
+          type: string
+          nullable: true
+          description: 썸네일 이미지 URL
+        price:
+          type: number
+          description: 현재 상품 가격 (₩)
+        quantity:
+          type: integer
+          description: 담긴 수량
+
+    CartResponse:
+      type: object
+      properties:
+        cartId:
+          type: integer
+          description: 장바구니 고유 ID
+        items:
+          type: array
+          description: 장바구니에 담긴 상품 목록
+          items:
+            $ref: '#/components/schemas/CartItem'
+
+    AddToCartRequest:
+      type: object
+      required: [productId, quantity]
+      properties:
+        productId:
+          type: integer
+          description: 담을 상품 ID
+        quantity:
+          type: integer
+          description: 담을 수량 (최소 1)
+          minimum: 1
+
+    UpdateCartItemRequest:
+      type: object
+      required: [quantity]
+      properties:
+        quantity:
+          type: integer
+          description: 변경할 수량 (0이면 해당 아이템 삭제)
+          minimum: 0
+
+    # ── 주문 스키마 ──
     OrderCreateRequest:
       type: object
       required: [items]

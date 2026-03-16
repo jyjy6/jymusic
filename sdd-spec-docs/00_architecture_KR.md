@@ -43,7 +43,7 @@ Jymusic 프로젝트는 음악 앨범 판매 이커머스 서비스를 위한 �
 ④ 이후 기능 변경 시 테스트가 회귀 방어막 역할
 
 ### 2.4 스펙 기반 개발 (Spec-Driven Development)
-- 모든 API 변경은 OpenAPI Specification (OAS 3.0/3.1) 정의에서 시작합니다.
+- 모든 API 변경은 OpenAPI Specification (OAS 3.0/3.1) openapi.yaml 정의에서 시작합니다. 
 - 문서는 '진실의 원천'이며, 실제 구현은 이 스펙을 엄격히 따라야 합니다.
 
 ## 3. 통신 및 보안 원칙
