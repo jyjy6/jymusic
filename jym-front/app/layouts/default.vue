@@ -20,6 +20,7 @@
             >
               상품
             </NuxtLink>
+            <CartIcon />
             <template v-if="authStore.isLoggedIn">
               <NuxtLink
                 v-if="authStore.user?.role === 'ROLE_ADMIN'"
@@ -73,6 +74,7 @@
 <script setup lang="ts">
 import type { AxiosInstance } from 'axios'
 import AppToast from '~/components/AppToast.vue'
+import CartIcon from '~/components/cart/CartIcon.vue'
 import { useAuthStore } from '~/stores/auth'
 
 const authStore = useAuthStore()

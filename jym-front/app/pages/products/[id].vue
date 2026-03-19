@@ -84,14 +84,31 @@
             {{ stockLabel }}
           </p>
 
-          <button
-            type="button"
-            :disabled="product.stockQuantity === 0"
-            class="mt-8 inline-flex w-full items-center justify-center rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-gray-300"
-            @click="handleOrder"
-          >
-            Order
-          </button>
+          <div class="mt-6">
+            <QuantityInput
+              v-model="quantity"
+              :max="product.stockQuantity"
+            />
+          </div>
+
+          <div class="mt-4 flex gap-3">
+            <button
+              type="button"
+              :disabled="product.stockQuantity === 0 || isAddingToCart"
+              class="flex-1 rounded-xl border border-indigo-600 px-4 py-3 text-sm font-semibold text-indigo-600 transition hover:bg-indigo-50 disabled:cursor-not-allowed disabled:border-gray-300 disabled:text-gray-400"
+              @click="handleAddToCart"
+            >
+              {{ isAddingToCart ? '담는 중...' : '🛒 장바구니 담기' }}
+            </button>
+            <button
+              type="button"
+              :disabled="product.stockQuantity === 0 || isDirectBuying"
+              class="flex-1 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+              @click="handleDirectBuy"
+            >
+              {{ isDirectBuying ? '처리 중...' : '바로 결제 →' }}
+            </button>
+          </div>
         </div>
       </section>
 
@@ -106,9 +123,12 @@
 </template>
 
 <script setup lang="ts">
+import type { AxiosInstance } from 'axios'
 import { useProductDetail } from '~/composables/useCatalog'
 import { useUiToast } from '~/composables/useUiToast'
 import { useAuthStore } from '~/stores/auth'
+import { useCartStore } from '~/stores/cart'
+import QuantityInput from '~/components/cart/QuantityInput.vue'
 import type { ProductDetail } from '~/types/catalog'
 
 definePageMeta({
@@ -120,13 +140,19 @@ const FALLBACK_IMAGE = '/images/default-album.svg'
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
+const cartStore = useCartStore()
 const { showToast } = useUiToast()
+const { $axios } = useNuxtApp()
+const axios = $axios as AxiosInstance
 
 const product = ref<ProductDetail | null>(null)
 const isLoading = ref(true)
 const isNotFound = ref(false)
 const fetchError = ref('')
 const imageSrc = ref(FALLBACK_IMAGE)
+const quantity = ref(1)
+const isAddingToCart = ref(false)
+const isDirectBuying = ref(false)
 
 const productId = computed(() => {
   const rawId = Array.isArray(route.params.id) ? route.params.id[0] : route.params.id
@@ -196,16 +222,42 @@ const handleBack = async () => {
   await navigateTo('/products')
 }
 
-const handleOrder = async () => {
+const handleAddToCart = async () => {
   if (!product.value || product.value.stockQuantity === 0) return
-
   if (!authStore.isLoggedIn) {
-    showToast('Please log in.', 'warning')
+    showToast('로그인이 필요합니다.', 'warning')
     await navigateTo('/auth/login')
     return
   }
+  isAddingToCart.value = true
+  try {
+    await cartStore.addItem(product.value.id, quantity.value)
+    showToast('장바구니에 담았습니다.', 'success')
+  } catch {
+    showToast('담기에 실패했습니다. 다시 시도해 주세요.', 'error')
+  } finally {
+    isAddingToCart.value = false
+  }
+}
 
-  showToast('Order feature is coming soon.', 'info')
+const handleDirectBuy = async () => {
+  if (!product.value || product.value.stockQuantity === 0) return
+  if (!authStore.isLoggedIn) {
+    showToast('로그인이 필요합니다.', 'warning')
+    await navigateTo('/auth/login')
+    return
+  }
+  isDirectBuying.value = true
+  try {
+    const res = await axios.post<{ id: number }>('/api/v1/orders', {
+      items: [{ productId: product.value.id, quantity: quantity.value }],
+    })
+    await navigateTo(`/checkout?orderId=${res.data.id}`)
+  } catch {
+    showToast('주문 생성에 실패했습니다.', 'error')
+  } finally {
+    isDirectBuying.value = false
+  }
 }
 
 onMounted(async () => {

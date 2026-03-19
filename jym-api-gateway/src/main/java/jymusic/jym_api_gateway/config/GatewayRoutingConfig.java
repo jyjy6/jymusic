@@ -55,6 +55,7 @@ public class GatewayRoutingConfig {
     @Bean
     public RouterFunction<ServerResponse> orderRoute() {
         return route("order_service")
+                .route(path("/api/v1/cart/**"), http())
                 .route(path("/api/v1/orders/**"), http())
                 .before(uri(orderUrl))
                 .build();
