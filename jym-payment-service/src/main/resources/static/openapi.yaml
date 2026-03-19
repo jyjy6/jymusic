@@ -1,0 +1,311 @@
+openapi: 3.0.1
+info:
+  title: Jymusic 결제 서비스 API
+  description: |
+    Toss Payments 연동 기반의 결제 처리 API 명세입니다.
+
+    ## 결제 플로우
+    ```
+    1. POST /payments/prepare   → 서버 금액 검증 + 준비 레코드 생성
+    2. [Toss SDK] 클라이언트에서 결제창 호출 (서버 관여 없음)
+    3. POST /payments/confirm   → Toss 승인 API 호출 + DB 저장
+    4. POST /payments/cancel    → 결제 취소 (환불)
+    ```
+  version: 2.0.0
+servers:
+  - url: /api/v1
+    description: API 게이트웨이 경로
+
+paths:
+  /payments/prepare:
+    post:
+      tags:
+        - 결제
+      summary: 결제 준비 (금액 위변조 방지)
+      description: |
+        결제 시작 전 서버에서 주문 금액을 검증하고 준비 레코드를 저장합니다.
+        클라이언트는 반환된 `clientKey`로 Toss Payments SDK를 초기화합니다.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentPrepareRequest'
+      responses:
+        '200':
+          description: 결제 준비 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentPrepareResponse'
+        '400':
+          description: 잘못된 금액 또는 주문 상태
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          description: 주문을 찾을 수 없음
+          $ref: '#/components/responses/ErrorResponse'
+
+  /payments/confirm:
+    post:
+      tags:
+        - 결제
+      summary: 결제 최종 승인
+      description: |
+        Toss Payments 결제창에서 결제 완료 후 successUrl 리다이렉트 시 호출합니다.
+        서버에서 저장된 금액과 요청 금액을 검증 후 Toss 승인 API를 호출합니다.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentConfirmRequest'
+      responses:
+        '200':
+          description: 결제 승인 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentConfirmResponse'
+        '400':
+          description: 금액 불일치 또는 이미 처리된 결제
+          $ref: '#/components/responses/ErrorResponse'
+        '402':
+          description: Toss 결제 승인 실패 (잔액 부족 등)
+          $ref: '#/components/responses/ErrorResponse'
+
+  /payments/cancel:
+    post:
+      tags:
+        - 결제
+      summary: 결제 취소 (환불)
+      description: 결제 완료된 건을 취소합니다. 부분 취소도 지원합니다.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentCancelRequest'
+      responses:
+        '200':
+          description: 취소 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentCancelResponse'
+        '400':
+          description: 취소 불가 상태
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          description: 결제 내역을 찾을 수 없음
+          $ref: '#/components/responses/ErrorResponse'
+
+  /payments/{paymentId}:
+    get:
+      tags:
+        - 결제
+      summary: 결제 내역 단건 조회
+      description: 결제 ID로 특정 결제의 상세 정보를 조회합니다.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: paymentId
+          in: path
+          required: true
+          description: 조회할 내부 결제 ID
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentDetail'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /payments/order/{orderId}:
+    get:
+      tags:
+        - 결제
+      summary: 주문 ID로 결제 내역 조회
+      description: 특정 주문에 연결된 결제 정보를 조회합니다.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          description: 조회할 주문 ID
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentDetail'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    ErrorResponse:
+      description: GlobalErrorHandler 기반의 공통 오류 응답
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+    PaymentPrepareRequest:
+      type: object
+      required: [orderId, amount]
+      properties:
+        orderId:
+          type: integer
+          description: 결제할 주문 ID
+        amount:
+          type: number
+          description: 결제 금액 (클라이언트 계산값, 서버에서 재검증)
+
+    PaymentPrepareResponse:
+      type: object
+      properties:
+        clientKey:
+          type: string
+          description: Toss Payments SDK 초기화용 클라이언트 키 (공개 키)
+        orderId:
+          type: integer
+          description: 주문 ID
+        amount:
+          type: number
+          description: 서버 검증 완료된 최종 결제 금액
+
+    PaymentConfirmRequest:
+      type: object
+      required: [paymentKey, orderId, amount]
+      properties:
+        paymentKey:
+          type: string
+          description: Toss Payments 결제 키 (successUrl 쿼리 파라미터로 수신)
+        orderId:
+          type: integer
+          description: 주문 ID
+        amount:
+          type: number
+          description: 결제 금액 (payment_prepare 레코드와 대조 검증)
+
+    PaymentConfirmResponse:
+      type: object
+      properties:
+        paymentId:
+          type: integer
+          description: 내부 결제 고유 ID
+        transactionId:
+          type: string
+          description: PG사 거래 고유 ID
+        status:
+          type: string
+          description: 최종 결제 상태
+          enum: [SUCCESS, FAILED]
+        method:
+          type: string
+          description: 결제 수단
+          enum: [CARD, VIRTUAL_ACCOUNT, KAKAO_PAY, NAVER_PAY]
+        paidAmount:
+          type: number
+          description: 실 결제 금액
+        paidAt:
+          type: string
+          format: date-time
+          description: 결제 완료 일시
+
+    PaymentCancelRequest:
+      type: object
+      required: [paymentKey, cancelReason]
+      properties:
+        paymentKey:
+          type: string
+          description: 취소할 결제의 Toss paymentKey
+        cancelReason:
+          type: string
+          description: 취소 사유 (최대 200자)
+          maxLength: 200
+        cancelAmount:
+          type: number
+          description: 부분 취소 금액 (미입력 시 전액 취소)
+          nullable: true
+
+    PaymentCancelResponse:
+      type: object
+      properties:
+        paymentId:
+          type: integer
+        status:
+          type: string
+          enum: [CANCELLED]
+        cancelledAmount:
+          type: number
+          description: 취소된 금액
+        cancelledAt:
+          type: string
+          format: date-time
+
+    PaymentDetail:
+      type: object
+      properties:
+        paymentId:
+          type: integer
+        orderId:
+          type: integer
+        paymentKey:
+          type: string
+        status:
+          type: string
+          enum: [PENDING, SUCCESS, FAILED, CANCELLED]
+        method:
+          type: string
+          enum: [CARD, VIRTUAL_ACCOUNT, KAKAO_PAY, NAVER_PAY]
+        amount:
+          type: number
+        pgProvider:
+          type: string
+          example: TOSS
+        paidAt:
+          type: string
+          format: date-time
+          nullable: true
+        cancelledAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    ErrorResponse:
+      type: object
+      properties:
+        status:
+          type: integer
+        code:
+          type: string
+        message:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
