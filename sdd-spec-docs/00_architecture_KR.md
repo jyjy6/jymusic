@@ -6,7 +6,7 @@ Jymusic 프로젝트는 음악 앨범 판매 이커머스 서비스를 위한 �
 ### 1.1 핵심 기술 스택
 - **프론트엔드**: Nuxt 4 (Vue 3, TypeScript, Nitro 엔진)
 - **백엔드**: Spring Boot 3.x / 4.x (Java 21), Spring Cloud
-- **API 게이트웨이**: Spring Cloud Gateway (WebMvc)
+- **API 게이트웨이**: Spring Cloud Gateway (WebFlux / Reactor Netty)
 - **데이터베이스**: MySQL (서비스별 데이터베이스 독립 패턴)
 
 ## 2. 기본 원칙 (아키텍처 헌법)

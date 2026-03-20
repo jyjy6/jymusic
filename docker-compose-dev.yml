@@ -12,11 +12,6 @@ services:
       - redis_data:/data
     networks:
       - jym-network
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   # ──────────────────────────────────────────
   # Backend Services
@@ -35,8 +30,7 @@ services:
     ports:
       - "8081:8080"
     depends_on:
-      redis:
-        condition: service_healthy
+      - redis
     networks:
       - jym-network
 
@@ -61,12 +55,6 @@ services:
       - "8083:8080"
     networks:
       - jym-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 40s
 
   jym-payment-service:
     build:
@@ -78,12 +66,6 @@ services:
       - "8084:8080"
     networks:
       - jym-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 40s
 
   jym-api-gateway:
     build:
@@ -99,14 +81,10 @@ services:
     ports:
       - "8080:8080"
     depends_on:
-      jym-member-auth-service:
-        condition: service_started
-      jym-catalog-service:
-        condition: service_started
-      jym-order-service:
-        condition: service_healthy
-      jym-payment-service:
-        condition: service_healthy
+      - jym-member-auth-service
+      - jym-catalog-service
+      - jym-order-service
+      - jym-payment-service
     networks:
       - jym-network
 

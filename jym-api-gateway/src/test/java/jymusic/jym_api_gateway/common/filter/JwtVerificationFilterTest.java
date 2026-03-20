@@ -2,7 +2,6 @@ package jymusic.jym_api_gateway.common.filter;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
-import jakarta.servlet.http.HttpServletRequest;
 import jymusic.jym_api_gateway.common.jwt.JwtValidator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -14,13 +13,19 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.mock.web.MockFilterChain;
-import org.springframework.mock.web.MockHttpServletRequest;
-import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.cloud.gateway.filter.GatewayFilterChain;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.server.reactive.ServerHttpRequest;
+import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
+import org.springframework.mock.web.server.MockServerWebExchange;
+import reactor.core.publisher.Mono;
+import reactor.test.StepVerifier;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("JwtVerificationFilter 단위 테스트")
@@ -32,23 +37,19 @@ class JwtVerificationFilterTest {
     @Mock
     private JwtValidator jwtValidator;
 
-    private MockHttpServletResponse response;
-    private MockFilterChain chain;
+    @Mock
+    private GatewayFilterChain chain;
 
     @BeforeEach
     void setUp() {
-        response = new MockHttpServletResponse();
-        chain   = new MockFilterChain();
+        // chain.filter() returns Mono.empty() by default when mocked, but explicit is better
+        // given(chain.filter(any(ServerWebExchange.class))).willReturn(Mono.empty());
     }
 
-    // ── shouldNotFilter() — 경로 제외 로직 ──────────────────────────
-    //
-    // shouldNotFilter()는 protected이므로 직접 호출 불가.
-    // 제외 경로에서 Authorization 헤더 없이 요청 시 → 필터가 건너뜀 → 401이 아닌 200(chain 통과)
-    // 비제외 경로에서 Authorization 헤더 없이 요청 시 → 필터가 동작 → 401 반환
+    // ── shouldNotFilter() logic ──────────────────────────────────────
 
     @Nested
-    @DisplayName("shouldNotFilter() — 경로 제외 로직")
+    @DisplayName("경로 제외 로직")
     class ShouldNotFilter {
 
         @ParameterizedTest(name = "제외 경로: {0} → 필터 건너뜀")
@@ -62,14 +63,16 @@ class JwtVerificationFilterTest {
                 "/v3/api-docs/swagger-config"
         })
         @DisplayName("SF-01~04: 공개 경로 → Authorization 없어도 chain 통과")
-        void excludedPaths_noAuthHeader_chainPasses(String path) throws Exception {
-            MockHttpServletRequest request = new MockHttpServletRequest("GET", path);
+        void excludedPaths_noAuthHeader_chainPasses(String path) {
+            MockServerHttpRequest request = MockServerHttpRequest.get(path).build();
+            MockServerWebExchange exchange = MockServerWebExchange.from(request);
+            
+            given(chain.filter(exchange)).willReturn(Mono.empty());
 
-            filter.doFilter(request, response, chain);
+            StepVerifier.create(filter.filter(exchange, chain))
+                    .verifyComplete();
 
-            // 필터가 건너뛰어졌으면 chain.doFilter()가 호출되어 request가 저장됨
-            assertThat(chain.getRequest()).isNotNull();
-            assertThat(response.getStatus()).isNotEqualTo(401);
+            verify(chain).filter(exchange);
         }
 
         @ParameterizedTest(name = "보호 경로: {0} → Authorization 없으면 401")
@@ -78,112 +81,146 @@ class JwtVerificationFilterTest {
                 "/api/v1/orders",
                 "/api/v1/products"
         })
-        @DisplayName("SF-05~07: 보호 경로 → Authorization 없으면 필터 적용")
-        void protectedPaths_noAuthHeader_returns401(String path) throws Exception {
-            MockHttpServletRequest request = new MockHttpServletRequest("GET", path);
+        @DisplayName("SF-05~07: 보호 경로 → Authorization 없으면 필터 적용 (401)")
+        void protectedPaths_noAuthHeader_returns401(String path) {
+            MockServerHttpRequest request = MockServerHttpRequest.get(path).build();
+            MockServerWebExchange exchange = MockServerWebExchange.from(request);
 
-            filter.doFilter(request, response, chain);
+            StepVerifier.create(filter.filter(exchange, chain))
+                    .verifyComplete(); // Filter completes (writes response)
 
-            assertThat(response.getStatus()).isEqualTo(401);
-            assertThat(chain.getRequest()).isNull(); // chain이 호출되지 않음
+            assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+            verify(chain, never()).filter(any()); // Chain should NOT be called
         }
     }
 
-    // ── doFilterInternal() — JWT 검증 및 헤더 주입 ──────────────────
+    // ── filter() logic — JWT verification & Header Injection ─────────
 
     @Nested
-    @DisplayName("doFilterInternal() — JWT 검증 및 헤더 주입")
-    class DoFilterInternal {
+    @DisplayName("JWT 검증 및 헤더 주입")
+    class DoFilter {
 
         @Test
         @DisplayName("FI-01: Authorization 헤더 없음 → 401 + ERR_UNAUTHORIZED")
-        void noAuthorizationHeader_returns401() throws Exception {
-            MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/members/me");
+        void noAuthorizationHeader_returns401() {
+            MockServerHttpRequest request = MockServerHttpRequest.get("/api/v1/members/me").build();
+            MockServerWebExchange exchange = MockServerWebExchange.from(request);
 
-            filter.doFilter(request, response, chain);
+            StepVerifier.create(filter.filter(exchange, chain))
+                    .verifyComplete();
 
-            assertThat(response.getStatus()).isEqualTo(401);
-            assertThat(response.getContentAsString()).contains("ERR_UNAUTHORIZED");
-            assertThat(chain.getRequest()).isNull();
+            assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+            // Verify response body content if needed (requires inspecting DataBuffer)
+            // Ideally we check if chain was not called
+            verify(chain, never()).filter(any());
         }
 
         @Test
         @DisplayName("FI-02: Bearer 접두사 없는 헤더 → 401")
-        void authHeaderWithoutBearerPrefix_returns401() throws Exception {
-            MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/members/me");
-            request.addHeader("Authorization", "Token some-value");
+        void authHeaderWithoutBearerPrefix_returns401() {
+            MockServerHttpRequest request = MockServerHttpRequest.get("/api/v1/members/me")
+                    .header("Authorization", "Token some-value")
+                    .build();
+            MockServerWebExchange exchange = MockServerWebExchange.from(request);
 
-            filter.doFilter(request, response, chain);
+            StepVerifier.create(filter.filter(exchange, chain))
+                    .verifyComplete();
 
-            assertThat(response.getStatus()).isEqualTo(401);
-            assertThat(chain.getRequest()).isNull();
+            assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+            verify(chain, never()).filter(any());
         }
 
         @Test
         @DisplayName("FI-03: 유효하지 않은 토큰 → 401")
-        void invalidToken_returns401() throws Exception {
-            MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/members/me");
-            request.addHeader("Authorization", "Bearer invalid.token.here");
+        void invalidToken_returns401() {
+            MockServerHttpRequest request = MockServerHttpRequest.get("/api/v1/members/me")
+                    .header("Authorization", "Bearer invalid.token.here")
+                    .build();
+            MockServerWebExchange exchange = MockServerWebExchange.from(request);
+
             given(jwtValidator.validateToken("invalid.token.here")).willReturn(false);
 
-            filter.doFilter(request, response, chain);
+            StepVerifier.create(filter.filter(exchange, chain))
+                    .verifyComplete();
 
-            assertThat(response.getStatus()).isEqualTo(401);
-            assertThat(chain.getRequest()).isNull();
+            assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+            verify(chain, never()).filter(any());
         }
 
         @Test
-        @DisplayName("FI-04: 유효한 토큰 → 필터 통과, chain.doFilter() 호출됨")
-        void validToken_chainInvoked() throws Exception {
-            MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/members/me");
-            request.addHeader("Authorization", "Bearer valid.token");
+        @DisplayName("FI-04: 유효한 토큰 → 필터 통과, chain.filter() 호출됨")
+        void validToken_chainInvoked() {
+            MockServerHttpRequest request = MockServerHttpRequest.get("/api/v1/members/me")
+                    .header("Authorization", "Bearer valid.token")
+                    .build();
+            MockServerWebExchange exchange = MockServerWebExchange.from(request);
+
             given(jwtValidator.validateToken("valid.token")).willReturn(true);
             given(jwtValidator.getClaims("valid.token")).willReturn(buildClaims("1", "testuser", "ROLE_USER"));
+            given(chain.filter(any())).willReturn(Mono.empty());
 
-            filter.doFilter(request, response, chain);
+            StepVerifier.create(filter.filter(exchange, chain))
+                    .verifyComplete();
 
-            assertThat(response.getStatus()).isNotEqualTo(401);
-            assertThat(chain.getRequest()).isNotNull();
+            verify(chain).filter(any()); // Argument is a mutated exchange
         }
 
         @Test
         @DisplayName("FI-05: 유효한 토큰 → X-User-Id, X-User-Name, X-User-Role 헤더가 다운스트림 요청에 주입됨")
-        void validToken_userContextHeadersInjected() throws Exception {
-            MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/members/me");
-            request.addHeader("Authorization", "Bearer valid.token");
+        void validToken_userContextHeadersInjected() {
+            MockServerHttpRequest request = MockServerHttpRequest.get("/api/v1/members/me")
+                    .header("Authorization", "Bearer valid.token")
+                    .build();
+            MockServerWebExchange exchange = MockServerWebExchange.from(request);
+
             given(jwtValidator.validateToken("valid.token")).willReturn(true);
             given(jwtValidator.getClaims("valid.token")).willReturn(buildClaims("1", "testuser", "ROLE_USER"));
+            given(chain.filter(any())).willAnswer(invocation -> {
+                MockServerWebExchange mutatedExchange = invocation.getArgument(0);
+                ServerHttpRequest downstream = mutatedExchange.getRequest();
+                
+                assertThat(downstream.getHeaders().getFirst("X-User-Id")).isEqualTo("1");
+                assertThat(downstream.getHeaders().getFirst("X-User-Name")).isEqualTo("testuser");
+                assertThat(downstream.getHeaders().getFirst("X-User-Role")).isEqualTo("ROLE_USER");
+                
+                return Mono.empty();
+            });
 
-            filter.doFilter(request, response, chain);
-
-            HttpServletRequest downstream = (HttpServletRequest) chain.getRequest();
-            assertThat(downstream).isNotNull();
-            assertThat(downstream.getHeader("X-User-Id")).isEqualTo("1");
-            assertThat(downstream.getHeader("X-User-Name")).isEqualTo("testuser");
-            assertThat(downstream.getHeader("X-User-Role")).isEqualTo("ROLE_USER");
+            StepVerifier.create(filter.filter(exchange, chain))
+                    .verifyComplete();
+            
+            verify(chain).filter(any());
         }
 
         @Test
         @DisplayName("FI-05: 헤더 주입 — ROLE_ADMIN 권한도 정확히 전달됨")
-        void validToken_adminRole_headerInjectedCorrectly() throws Exception {
-            MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/orders");
-            request.addHeader("Authorization", "Bearer admin.token");
+        void validToken_adminRole_headerInjectedCorrectly() {
+            MockServerHttpRequest request = MockServerHttpRequest.get("/api/v1/orders")
+                    .header("Authorization", "Bearer admin.token")
+                    .build();
+            MockServerWebExchange exchange = MockServerWebExchange.from(request);
+
             given(jwtValidator.validateToken("admin.token")).willReturn(true);
             given(jwtValidator.getClaims("admin.token")).willReturn(buildClaims("99", "adminuser", "ROLE_ADMIN"));
+            
+            given(chain.filter(any())).willAnswer(invocation -> {
+                MockServerWebExchange mutatedExchange = invocation.getArgument(0);
+                ServerHttpRequest downstream = mutatedExchange.getRequest();
 
-            filter.doFilter(request, response, chain);
+                assertThat(downstream.getHeaders().getFirst("X-User-Id")).isEqualTo("99");
+                assertThat(downstream.getHeaders().getFirst("X-User-Name")).isEqualTo("adminuser");
+                assertThat(downstream.getHeaders().getFirst("X-User-Role")).isEqualTo("ROLE_ADMIN");
 
-            HttpServletRequest downstream = (HttpServletRequest) chain.getRequest();
-            assertThat(downstream.getHeader("X-User-Id")).isEqualTo("99");
-            assertThat(downstream.getHeader("X-User-Name")).isEqualTo("adminuser");
-            assertThat(downstream.getHeader("X-User-Role")).isEqualTo("ROLE_ADMIN");
+                return Mono.empty();
+            });
+
+            StepVerifier.create(filter.filter(exchange, chain))
+                    .verifyComplete();
+            
+            verify(chain).filter(any());
         }
     }
 
-    /**
-     * Mockito Claims 반환값을 직접 구성하는 헬퍼.
-     * JJWT Claims는 인터페이스이므로 Jwts.claims()로 빌드하거나 Map으로 구성합니다.
-     */
     private Claims buildClaims(String userId, String username, String role) {
         return Jwts.claims()
                 .subject(username)

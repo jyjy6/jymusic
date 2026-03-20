@@ -8,7 +8,7 @@ The Jymusic project is a Music Album E-commerce platform built on a Microservice
 
 - **Frontend**: Nuxt 4 (Vue 3, TypeScript, Nitro engine)
 - **Backend**: Spring Boot 3.x / 4.x (Java 21), Spring Cloud
-- **API Gateway**: Spring Cloud Gateway (WebMvc)
+- **API Gateway**: Spring Cloud Gateway (WebFlux / Reactor Netty)
 - **Database**: MySQL (Database-per-service pattern)
 
 ## 2. Fundamental Principles
