@@ -6,9 +6,9 @@ This document defines the unit test specification for `jym-api-gateway`.
 
 The gateway has **no business logic** — its sole responsibilities are:
 - JWT signature verification (via `JwtValidator`)
-- User context header injection (via `JwtVerificationFilter`)
-- CORS policy enforcement (via `SpringSecurityConfig`)
-- Path-based routing (via `GatewayRoutingConfig`)
+- User context header injection (via `JwtVerificationFilter` — `GlobalFilter`)
+- CORS policy enforcement (via `SecurityConfig`)
+- Path-based routing (via `GatewayRouteConfig`)
 
 Routing tests (actual HTTP forwarding to downstream services) require live services
 and are deferred as integration tests per `00_architecture.md §2.3`.
@@ -20,8 +20,8 @@ and are deferred as integration tests per `00_architecture.md §2.3`.
 | Layer | Annotation / Tool | Scope |
 | :--- | :--- | :--- |
 | JwtValidator | `@ExtendWith(MockitoExtension.class)` | Token signature verification |
-| JwtVerificationFilter | `MockHttpServletRequest` / `MockFilterChain` | Filter behavior without Spring context |
-| CORS Config | `@SpringBootTest` + `MockMvc` | CORS headers on preflight requests |
+| JwtVerificationFilter | `WebTestClient` + `@SpringBootTest(webEnvironment = RANDOM_PORT)` or `MockServerWebExchange` | GlobalFilter behavior verification |
+| CORS Config | `@SpringBootTest` + `WebTestClient` | CORS headers on preflight requests |
 
 ---
 
@@ -31,6 +31,8 @@ and are deferred as integration tests per `00_architecture.md §2.3`.
 
 The constructor reads a PEM public key from a `Resource`. Tests generate an RSA key pair
 programmatically and inject it via `ByteArrayResource` — no real key files required.
+
+> `JwtValidator` is a pure Java utility — no test changes required due to WebMvc/WebFlux migration.
 
 #### `validateToken(String token)`
 
@@ -51,34 +53,51 @@ programmatically and inject it via `ByteArrayResource` — no real key files req
 
 ---
 
-## 4. JwtVerificationFilter Tests
+## 4. JwtVerificationFilter Tests (GlobalFilter)
 
 ### `JwtVerificationFilterTest`
 
-Uses `MockHttpServletRequest`, `MockHttpServletResponse`, and `MockFilterChain` directly.
-No Spring context needed. `JwtValidator` is injected as a `@Mock`.
+Uses `WebTestClient` with `@SpringBootTest(webEnvironment = RANDOM_PORT)` to verify
+`GlobalFilter` behavior on an actual Netty server.
 
-#### `shouldNotFilter()` — Path Exclusion Logic
+Alternatively, for lightweight unit tests, use `MockServerWebExchange` and `MockGatewayFilterChain`.
+`JwtValidator` is injected as a `@Mock`.
 
-| # | Path | Expected (`shouldNotFilter`) |
+#### Path Exclusion Logic (shouldSkip)
+
+| # | Path | Expected |
 | :--- | :--- | :--- |
-| SF-01 | `/api/v1/auth/login` | `true` — filter skipped |
-| SF-02 | `/api/v1/auth/register` | `true` — filter skipped |
-| SF-03 | `/api/v1/auth/refresh-token` | `true` — filter skipped |
-| SF-04 | `/swagger-ui/index.html` | `true` — filter skipped |
-| SF-05 | `/api/v1/members/me` | `false` — filter applied |
-| SF-06 | `/api/v1/orders` | `false` — filter applied |
-| SF-07 | `/api/v1/products` | `false` — filter applied |
+| SF-01 | `/api/v1/auth/login` | Filter skipped — `chain.filter()` invoked immediately |
+| SF-02 | `/api/v1/auth/register` | Filter skipped |
+| SF-03 | `/api/v1/auth/refresh-token` | Filter skipped |
+| SF-04 | `/swagger-ui/index.html` | Filter skipped |
+| SF-05 | `/api/v1/members/me` | Filter applied |
+| SF-06 | `/api/v1/orders` | Filter applied |
+| SF-07 | `/api/v1/products` | Filter applied |
 
-#### `doFilterInternal()` — JWT Validation & Header Injection
+#### JWT Validation & Header Injection (`filter()`)
 
 | # | Scenario | Setup | Expected |
 | :--- | :--- | :--- | :--- |
 | FI-01 | Missing `Authorization` header | No `Authorization` header | Status 401, body contains `ERR_UNAUTHORIZED` |
 | FI-02 | Header without `Bearer ` prefix | `Authorization: JustToken abc` | Status 401 |
 | FI-03 | Invalid token | `validateToken` returns `false` | Status 401 |
-| FI-04 | Valid token — filter passes | `validateToken` returns `true`, valid claims | `filterChain.doFilter()` called; downstream request carries `X-User-Id`, `X-User-Name`, `X-User-Role` |
+| FI-04 | Valid token — filter passes | `validateToken` returns `true`, valid claims | `chain.filter()` called; downstream request carries `X-User-Id`, `X-User-Name`, `X-User-Role` |
 | FI-05 | Header injection accuracy | Claims: `userId=1`, `sub=testuser`, `role=ROLE_USER` | Downstream `X-User-Id=1`, `X-User-Name=testuser`, `X-User-Role=ROLE_USER` |
+
+### Test Implementation Reference
+
+```java
+// Lightweight unit test example
+MockServerHttpRequest request = MockServerHttpRequest
+        .get("/api/v1/orders")
+        .header("Authorization", "Bearer " + validToken)
+        .build();
+MockServerWebExchange exchange = MockServerWebExchange.from(request);
+
+StepVerifier.create(filter.filter(exchange, mockChain))
+        .verifyComplete();
+```
 
 ---
 
@@ -86,10 +105,11 @@ No Spring context needed. `JwtValidator` is injected as a `@Mock`.
 
 ### `CorsConfigTest`
 
-Uses `@SpringBootTest` + `MockMvc`. Verifies the `CorsConfigurationSource` bean behavior.
+Uses `@SpringBootTest(webEnvironment = RANDOM_PORT)` + `WebTestClient`.
+Verifies the `SecurityWebFilterChain` CORS behavior.
 
 > **Note**: `application-test.properties` must provide dummy `services.*` URLs to prevent
-> `@Value` resolution failures in `GatewayRoutingConfig`.
+> `@Value` resolution failures in `GatewayRouteConfig`.
 
 | # | Scenario | Request | Expected |
 | :--- | :--- | :--- | :--- |
@@ -97,6 +117,19 @@ Uses `@SpringBootTest` + `MockMvc`. Verifies the `CorsConfigurationSource` bean 
 | CO-02 | Disallowed origin — no CORS headers | `OPTIONS` + `Origin: http://evil.com` | No `Access-Control-Allow-Origin` header |
 | CO-03 | Credentials allowed | Valid CORS preflight | `Access-Control-Allow-Credentials: true` |
 | CO-04 | Allowed methods include DELETE | Preflight with `Access-Control-Request-Method: DELETE` | `Access-Control-Allow-Methods` includes `DELETE` |
+
+### Test Implementation Reference
+
+```java
+// WebTestClient-based CORS test example
+webTestClient.options()
+        .uri("/api/v1/products")
+        .header("Origin", "http://localhost:3000")
+        .header("Access-Control-Request-Method", "GET")
+        .exchange()
+        .expectHeader().valueEquals("Access-Control-Allow-Origin", "http://localhost:3000")
+        .expectHeader().valueEquals("Access-Control-Allow-Credentials", "true");
+```
 
 ---
 
