@@ -4,14 +4,15 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
+import org.springframework.mock.web.server.MockServerWebExchange;
 import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.reactive.CorsConfigurationSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * SpringSecurityConfig의 CORS 설정을 직접 단위 테스트합니다.
+ * SecurityConfig의 CORS 설정을 직접 단위 테스트합니다.
  * Spring 컨텍스트 불필요 — CorsConfigurationSource 빈을 직접 생성하여 검증합니다.
  */
 @DisplayName("CORS 설정 단위 테스트")
@@ -21,14 +22,14 @@ class CorsConfigTest {
 
     @BeforeEach
     void setUp() {
-        SpringSecurityConfig config = new SpringSecurityConfig();
+        SecurityConfig config = new SecurityConfig();
         corsConfigSource = config.corsConfigurationSource();
     }
 
     private CorsConfiguration getConfig() {
-        MockHttpServletRequest request = new MockHttpServletRequest();
-        request.setRequestURI("/api/v1/auth/login");
-        return corsConfigSource.getCorsConfiguration(request);
+        MockServerHttpRequest request = MockServerHttpRequest.get("/api/v1/auth/login").build();
+        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+        return corsConfigSource.getCorsConfiguration(exchange);
     }
 
     // ── 허용 Origin ────────────────────────────────────────────────
