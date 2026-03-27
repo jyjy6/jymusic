@@ -16,8 +16,8 @@ Jymusic은 음악 앨범을 판매하는 이커머스 서비스입니다.
 | 구분        | 기술                                                                                       |
 | ----------- | ------------------------------------------------------------------------------------------ |
 | Frontend    | Nuxt 4 (Vue 3, TypeScript, Tailwind CSS)                                                   |
-| Backend     | Spring Boot 3.x / 4.x (Java 21), JPA, MyBatis Spring Cloud, Kafka, Redis, LangChain4j, RAG |
-| API Gateway | Spring Cloud Gateway (WebMvc)                                                              |
+| Backend     | Spring Boot 3.x / 4.x (Java 21), JPA(CUD), MyBatis(R), Spring Cloud, Kafka, Redis, LangChain4j, RAG |
+| API Gateway | Spring Cloud Gateway (WebMvc->WebFlux 비동기 분산처리)                                        |
 | Database    | MySQL (서비스별 독립 DB), Pinecone                                                         |
 | 인증        | JWT (Stateless)                                                                            |
 | 인프라      | Docker / Docker Compose                                                                    |
