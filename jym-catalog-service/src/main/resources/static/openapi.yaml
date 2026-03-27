@@ -6,7 +6,7 @@ info:
 
     **인증 방식**: API Gateway가 JWT를 검증하고 `X-User-Id`, `X-User-Role` 헤더를 주입합니다.
     관리자 API는 `Authorization: Bearer <token>` 헤더가 필요합니다.
-  version: 1.1.0
+  version: 1.3.0
 
 servers:
   - url: /api/v1
@@ -100,6 +100,62 @@ paths:
         '404':
           description: 카테고리를 찾을 수 없음
           $ref: '#/components/responses/ErrorResponse'
+
+  /products/search:
+    get:
+      tags:
+        - 상품 (공개)
+      summary: 상품 검색
+      description: 키워드, 카테고리, 가격 범위, 정렬 복합 조건 검색 (MyBatis 동적 SQL)
+      operationId: searchProducts
+      parameters:
+        - name: keyword
+          in: query
+          schema:
+            type: string
+          description: 제목/아티스트 검색 키워드
+        - name: categoryId
+          in: query
+          schema:
+            type: integer
+            format: int64
+        - name: minPrice
+          in: query
+          schema:
+            type: number
+            format: decimal
+        - name: maxPrice
+          in: query
+          schema:
+            type: number
+            format: decimal
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 12
+        - name: sort
+          in: query
+          schema:
+            type: string
+            default: "createdAt,desc"
+            enum:
+              - "createdAt,desc"
+              - "price,asc"
+              - "price,desc"
+              - "title,asc"
+      responses:
+        '200':
+          description: 검색 결과
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductListResponse'
 
   /products/{productId}:
     get:

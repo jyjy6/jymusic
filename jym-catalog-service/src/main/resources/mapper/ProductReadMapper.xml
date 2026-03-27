@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="jymusic.jym_catalog_service.mapper.ProductReadMapper">
+
+    <sql id="productSummaryColumns">
+        p.id,
+        p.title,
+        p.artist,
+        p.price,
+        p.image_key AS imageKey
+    </sql>
+
+    <sql id="searchWhereClause">
+        <where>
+            p.is_available = TRUE
+            <if test="req.keyword != null and req.keyword != ''">
+                AND (
+                    p.title LIKE CONCAT('%', #{req.keyword}, '%')
+                    OR p.artist LIKE CONCAT('%', #{req.keyword}, '%')
+                )
+            </if>
+            <if test="req.categoryId != null">
+                AND p.category_id = #{req.categoryId}
+            </if>
+            <if test="req.minPrice != null">
+                AND p.price &gt;= #{req.minPrice}
+            </if>
+            <if test="req.maxPrice != null">
+                AND p.price &lt;= #{req.maxPrice}
+            </if>
+        </where>
+    </sql>
+
+    <sql id="searchOrderBy">
+        <choose>
+            <when test="req.sort == 'price,asc'">ORDER BY p.price ASC</when>
+            <when test="req.sort == 'price,desc'">ORDER BY p.price DESC</when>
+            <when test="req.sort == 'title,asc'">ORDER BY p.title ASC</when>
+            <otherwise>ORDER BY p.created_at DESC</otherwise>
+        </choose>
+    </sql>
+
+    <select id="findProducts" resultType="ProductSummaryResponse">
+        SELECT
+            <include refid="productSummaryColumns"/>
+        FROM products p
+        WHERE p.is_available = TRUE
+        <if test="categoryId != null">
+            AND p.category_id = #{categoryId}
+        </if>
+        ORDER BY p.created_at DESC
+        LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <select id="countProducts" resultType="long">
+        SELECT COUNT(*)
+        FROM products p
+        WHERE p.is_available = TRUE
+        <if test="categoryId != null">
+            AND p.category_id = #{categoryId}
+        </if>
+    </select>
+
+    <select id="findProductById" resultType="ProductDetailResponse">
+        SELECT
+            p.id,
+            p.title,
+            p.artist,
+            p.description,
+            p.price,
+            p.stock_quantity AS stockQuantity,
+            p.image_key      AS imageKey,
+            p.category_id    AS categoryId,
+            c.name           AS categoryName
+        FROM products p
+            LEFT JOIN categories c ON p.category_id = c.id
+        WHERE p.id = #{id}
+    </select>
+
+    <select id="searchProducts" resultType="ProductSummaryResponse">
+        SELECT
+            <include refid="productSummaryColumns"/>
+        FROM products p
+        <include refid="searchWhereClause"/>
+        <include refid="searchOrderBy"/>
+        LIMIT #{req.size} OFFSET #{req.offset}
+    </select>
+
+    <select id="countSearchProducts" resultType="long">
+        SELECT COUNT(*)
+        FROM products p
+        <include refid="searchWhereClause"/>
+    </select>
+
+</mapper>

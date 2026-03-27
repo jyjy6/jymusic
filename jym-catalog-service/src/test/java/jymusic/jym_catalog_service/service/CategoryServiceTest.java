@@ -3,6 +3,7 @@ package jymusic.jym_catalog_service.service;
 import jymusic.jym_catalog_service.common.GlobalErrorHandler.GlobalException;
 import jymusic.jym_catalog_service.domain.entity.Category;
 import jymusic.jym_catalog_service.domain.repository.CategoryRepository;
+import jymusic.jym_catalog_service.mapper.CategoryReadMapper;
 import jymusic.jym_catalog_service.dto.request.CategoryCreateRequest;
 import jymusic.jym_catalog_service.dto.request.CategoryUpdateRequest;
 import jymusic.jym_catalog_service.dto.response.CategoryResponse;
@@ -33,14 +34,17 @@ class CategoryServiceTest {
     @Mock
     CategoryRepository categoryRepository;
 
+    @Mock
+    CategoryReadMapper categoryReadMapper;
+
     // ─── getAllCategories ─────────────────────────────────────────────────
 
     @Test
     @DisplayName("카테고리 목록 조회 시 전체 CategoryResponse 리스트 반환")
     void getAllCategories_returnsList() {
-        given(categoryRepository.findAll()).willReturn(List.of(
-                Category.builder().id(1L).name("Rock").build(),
-                Category.builder().id(2L).name("Jazz").build()
+        given(categoryReadMapper.findAllCategories()).willReturn(List.of(
+                CategoryResponse.builder().id(1L).name("Rock").build(),
+                CategoryResponse.builder().id(2L).name("Jazz").build()
         ));
 
         List<CategoryResponse> result = categoryService.getAllCategories();

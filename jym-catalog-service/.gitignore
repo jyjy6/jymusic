@@ -36,6 +36,8 @@ out/
 ### VS Code ###
 .vscode/
 
+# QueryDSL Q-types are under build/ (already ignored)
+
 # Custom Security & Configs
 application.properties
 application-*.properties

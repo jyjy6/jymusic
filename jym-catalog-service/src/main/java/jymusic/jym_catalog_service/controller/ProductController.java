@@ -2,6 +2,7 @@ package jymusic.jym_catalog_service.controller;
 
 import jakarta.validation.Valid;
 import jymusic.jym_catalog_service.dto.request.ProductCreateRequest;
+import jymusic.jym_catalog_service.dto.request.ProductSearchRequest;
 import jymusic.jym_catalog_service.dto.request.ProductUpdateRequest;
 import jymusic.jym_catalog_service.dto.response.ProductDetailResponse;
 import jymusic.jym_catalog_service.dto.response.ProductListResponse;
@@ -11,6 +12,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
+import java.math.BigDecimal;
 
 @RestController
 @RequestMapping("/api/v1/products")
@@ -25,6 +28,29 @@ public class ProductController {
             @RequestParam(defaultValue = "12") int size,
             @RequestParam(required = false) Long categoryId) {
         return ResponseEntity.ok(productService.getProducts(page, size, categoryId));
+    }
+
+    @GetMapping("/search")
+    public ResponseEntity<ProductListResponse> searchProducts(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) BigDecimal minPrice,
+            @RequestParam(required = false) BigDecimal maxPrice,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "12") int size,
+            @RequestParam(defaultValue = "createdAt,desc") String sort) {
+
+        ProductSearchRequest request = ProductSearchRequest.builder()
+                .keyword(keyword)
+                .categoryId(categoryId)
+                .minPrice(minPrice)
+                .maxPrice(maxPrice)
+                .page(page)
+                .size(size)
+                .sort(sort)
+                .build();
+
+        return ResponseEntity.ok(productService.searchProducts(request));
     }
 
     @GetMapping("/{id}")
