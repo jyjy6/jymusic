@@ -5,7 +5,9 @@ import jymusic.jym_catalog_service.domain.entity.Category;
 import jymusic.jym_catalog_service.domain.entity.Product;
 import jymusic.jym_catalog_service.domain.repository.CategoryRepository;
 import jymusic.jym_catalog_service.domain.repository.ProductRepository;
+import jymusic.jym_catalog_service.mapper.ProductReadMapper;
 import jymusic.jym_catalog_service.dto.request.ProductCreateRequest;
+import jymusic.jym_catalog_service.dto.request.ProductSearchRequest;
 import jymusic.jym_catalog_service.dto.request.ProductUpdateRequest;
 import jymusic.jym_catalog_service.dto.response.ProductDetailResponse;
 import jymusic.jym_catalog_service.dto.response.ProductListResponse;
@@ -16,9 +18,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -44,6 +43,9 @@ class ProductServiceTest {
     @Mock
     CategoryRepository categoryRepository;
 
+    @Mock
+    ProductReadMapper productReadMapper;
+
     @BeforeEach
     void setUp() {
         ReflectionTestUtils.setField(productService, "s3BaseUrl",
@@ -55,7 +57,7 @@ class ProductServiceTest {
     @Test
     @DisplayName("존재하지 않는 상품 조회 시 ERR_PRODUCT_NOT_FOUND 예외")
     void getProduct_notFound_throwsException() {
-        given(productRepository.findById(999L)).willReturn(Optional.empty());
+        given(productReadMapper.findProductById(999L)).willReturn(null);
 
         assertThatThrownBy(() -> productService.getProduct(999L))
                 .isInstanceOf(GlobalException.class)
@@ -69,18 +71,17 @@ class ProductServiceTest {
     @Test
     @DisplayName("존재하는 상품 조회 시 ProductDetailResponse 반환")
     void getProduct_found_returnsDetail() {
-        Category category = Category.builder().id(1L).name("Rock").build();
-        Product product = Product.builder()
+        ProductDetailResponse dto = ProductDetailResponse.builder()
                 .id(1L)
                 .title("Abbey Road")
                 .artist("The Beatles")
                 .price(BigDecimal.valueOf(29000))
                 .stockQuantity(10)
-                .category(category)
-                .isAvailable(true)
+                .categoryId(1L)
+                .categoryName("Rock")
                 .build();
 
-        given(productRepository.findById(1L)).willReturn(Optional.of(product));
+        given(productReadMapper.findProductById(1L)).willReturn(dto);
 
         ProductDetailResponse response = productService.getProduct(1L);
 
@@ -94,26 +95,44 @@ class ProductServiceTest {
     @Test
     @DisplayName("categoryId 없이 상품 목록 조회 시 전체 상품 반환")
     void getProducts_noCategoryFilter_returnsAll() {
-        Page<Product> mockPage = new PageImpl<>(List.of());
-        given(productRepository.findByIsAvailableTrue(any(Pageable.class))).willReturn(mockPage);
+        given(productReadMapper.findProducts(null, 0, 12)).willReturn(List.of());
+        given(productReadMapper.countProducts(null)).willReturn(0L);
 
         ProductListResponse result = productService.getProducts(0, 12, null);
 
         assertThat(result.getContent()).isEmpty();
         assertThat(result.getTotalElements()).isZero();
-        verify(productRepository).findByIsAvailableTrue(any(Pageable.class));
+        verify(productReadMapper).findProducts(null, 0, 12);
+        verify(productReadMapper).countProducts(null);
     }
 
     @Test
     @DisplayName("categoryId 지정 시 카테고리 필터링 쿼리 실행")
     void getProducts_withCategoryFilter_callsFilterQuery() {
-        Page<Product> mockPage = new PageImpl<>(List.of());
-        given(productRepository.findByCategoryIdAndIsAvailableTrue(any(), any(Pageable.class)))
-                .willReturn(mockPage);
+        given(productReadMapper.findProducts(2L, 0, 12)).willReturn(List.of());
+        given(productReadMapper.countProducts(2L)).willReturn(0L);
 
         productService.getProducts(0, 12, 2L);
 
-        verify(productRepository).findByCategoryIdAndIsAvailableTrue(any(), any(Pageable.class));
+        verify(productReadMapper).findProducts(2L, 0, 12);
+        verify(productReadMapper).countProducts(2L);
+    }
+
+    @Test
+    @DisplayName("상품 검색 시 ProductReadMapper 동적 SQL 호출 후 목록 응답")
+    void searchProducts_delegatesToProductReadMapper() {
+        given(productReadMapper.searchProducts(any(ProductSearchRequest.class)))
+                .willReturn(List.of());
+        given(productReadMapper.countSearchProducts(any(ProductSearchRequest.class)))
+                .willReturn(0L);
+
+        ProductListResponse result = productService.searchProducts(
+                ProductSearchRequest.builder().keyword("Beatles").page(0).size(12).build());
+
+        assertThat(result.getContent()).isEmpty();
+        assertThat(result.getTotalElements()).isZero();
+        verify(productReadMapper).searchProducts(any(ProductSearchRequest.class));
+        verify(productReadMapper).countSearchProducts(any(ProductSearchRequest.class));
     }
 
     // ─── createProduct ────────────────────────────────────────────────────

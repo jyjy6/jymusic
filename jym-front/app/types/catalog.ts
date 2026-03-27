@@ -6,6 +6,16 @@ export interface ProductSummary {
   thumbnailUrl: string | null
 }
 
+export interface ProductSearchParams {
+  keyword?: string
+  categoryId?: number | null
+  minPrice?: number
+  maxPrice?: number
+  page?: number
+  size?: number
+  sort?: string
+}
+
 export interface ProductListResponse {
   content: ProductSummary[]
   totalElements: number

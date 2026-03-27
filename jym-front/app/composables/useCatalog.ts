@@ -3,6 +3,7 @@ import type {
   Category,
   ProductDetail,
   ProductListResponse,
+  ProductSearchParams,
   ProductSummary,
 } from "~/types/catalog";
 
@@ -118,6 +119,71 @@ export const useProducts = () => {
     isLoading,
     errorMessage,
     fetchProducts,
+  };
+};
+
+export const useProductSearch = () => {
+  const { $axios } = useNuxtApp();
+
+  const searchResults = useState<ProductSummary[]>("search-results", () => []);
+  const totalElements = useState<number>("search-total-elements", () => 0);
+  const totalPages = useState<number>("search-total-pages", () => 0);
+  const currentPage = useState<number>("search-current-page", () => 0);
+  const isLoading = useState<boolean>("search-loading", () => false);
+  const errorMessage = useState<string>("search-error", () => "");
+
+  const searchProducts = async (params: ProductSearchParams) => {
+    isLoading.value = true;
+    errorMessage.value = "";
+
+    try {
+      const queryParams: Record<string, string | number> = {};
+      if (params.keyword) queryParams.keyword = params.keyword;
+      if (params.categoryId != null) queryParams.categoryId = params.categoryId;
+      if (params.minPrice != null) queryParams.minPrice = params.minPrice;
+      if (params.maxPrice != null) queryParams.maxPrice = params.maxPrice;
+      queryParams.page = params.page ?? 0;
+      queryParams.size = params.size ?? 12;
+      if (params.sort) queryParams.sort = params.sort;
+
+      const response = await ($axios as AxiosInstance).get<ProductListResponse>(
+        "/api/v1/products/search",
+        { params: queryParams },
+      );
+
+      searchResults.value = response.data.content;
+      totalElements.value = response.data.totalElements;
+      totalPages.value = response.data.totalPages;
+      currentPage.value = params.page ?? 0;
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { message?: string } } };
+      searchResults.value = [];
+      totalElements.value = 0;
+      totalPages.value = 0;
+      errorMessage.value =
+        error.response?.data?.message ?? "검색 결과를 불러오지 못했습니다.";
+    } finally {
+      isLoading.value = false;
+    }
+  };
+
+  const resetSearch = () => {
+    searchResults.value = [];
+    totalElements.value = 0;
+    totalPages.value = 0;
+    currentPage.value = 0;
+    errorMessage.value = "";
+  };
+
+  return {
+    searchResults,
+    totalElements,
+    totalPages,
+    currentPage,
+    isLoading,
+    errorMessage,
+    searchProducts,
+    resetSearch,
   };
 };
 

@@ -6,6 +6,7 @@ import jymusic.jym_catalog_service.domain.repository.CategoryRepository;
 import jymusic.jym_catalog_service.dto.request.CategoryCreateRequest;
 import jymusic.jym_catalog_service.dto.request.CategoryUpdateRequest;
 import jymusic.jym_catalog_service.dto.response.CategoryResponse;
+import jymusic.jym_catalog_service.mapper.CategoryReadMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -19,12 +20,10 @@ import java.util.List;
 public class CategoryService {
 
     private final CategoryRepository categoryRepository;
+    private final CategoryReadMapper categoryReadMapper;
 
     public List<CategoryResponse> getAllCategories() {
-        return categoryRepository.findAll()
-                .stream()
-                .map(CategoryResponse::from)
-                .toList();
+        return categoryReadMapper.findAllCategories();
     }
 
     @Transactional

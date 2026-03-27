@@ -6,18 +6,19 @@ import jymusic.jym_catalog_service.domain.entity.Product;
 import jymusic.jym_catalog_service.domain.repository.CategoryRepository;
 import jymusic.jym_catalog_service.domain.repository.ProductRepository;
 import jymusic.jym_catalog_service.dto.request.ProductCreateRequest;
+import jymusic.jym_catalog_service.dto.request.ProductSearchRequest;
 import jymusic.jym_catalog_service.dto.request.ProductUpdateRequest;
 import jymusic.jym_catalog_service.dto.response.ProductDetailResponse;
 import jymusic.jym_catalog_service.dto.response.ProductListResponse;
 import jymusic.jym_catalog_service.dto.response.ProductSummaryResponse;
+import jymusic.jym_catalog_service.mapper.ProductReadMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -26,30 +27,52 @@ public class ProductService {
 
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
+    private final ProductReadMapper productReadMapper;
 
     @Value("${spring.cloud.aws.s3.base-url}")
     private String s3BaseUrl;
 
     public ProductListResponse getProducts(int page, int size, Long categoryId) {
-        Pageable pageable = PageRequest.of(page, size);
-        Page<Product> productPage;
+        int offset = page * size;
 
-        if (categoryId != null) {
-            productPage = productRepository.findByCategoryIdAndIsAvailableTrue(categoryId, pageable);
-        } else {
-            productPage = productRepository.findByIsAvailableTrue(pageable);
-        }
+        List<ProductSummaryResponse> content =
+                productReadMapper.findProducts(categoryId, offset, size);
+        content.forEach(dto -> dto.applyS3BaseUrl(s3BaseUrl));
 
-        Page<ProductSummaryResponse> mapped = productPage
-                .map(p -> ProductSummaryResponse.from(p, s3BaseUrl));
-        return ProductListResponse.from(mapped);
+        long totalElements = productReadMapper.countProducts(categoryId);
+        int totalPages = (int) Math.ceil((double) totalElements / size);
+
+        return ProductListResponse.builder()
+                .content(content)
+                .totalElements(totalElements)
+                .totalPages(totalPages)
+                .build();
     }
 
     public ProductDetailResponse getProduct(Long id) {
-        Product product = productRepository.findById(id)
-                .orElseThrow(() -> new GlobalException(
-                        "상품을 찾을 수 없습니다.", "ERR_PRODUCT_NOT_FOUND", HttpStatus.NOT_FOUND));
-        return ProductDetailResponse.from(product, s3BaseUrl);
+        ProductDetailResponse response = productReadMapper.findProductById(id);
+
+        if (response == null) {
+            throw new GlobalException(
+                    "상품을 찾을 수 없습니다.", "ERR_PRODUCT_NOT_FOUND", HttpStatus.NOT_FOUND);
+        }
+
+        response.applyS3BaseUrl(s3BaseUrl);
+        return response;
+    }
+
+    public ProductListResponse searchProducts(ProductSearchRequest request) {
+        List<ProductSummaryResponse> content = productReadMapper.searchProducts(request);
+        content.forEach(dto -> dto.applyS3BaseUrl(s3BaseUrl));
+
+        long totalElements = productReadMapper.countSearchProducts(request);
+        int totalPages = (int) Math.ceil((double) totalElements / request.getSize());
+
+        return ProductListResponse.builder()
+                .content(content)
+                .totalElements(totalElements)
+                .totalPages(totalPages)
+                .build();
     }
 
     @Transactional
