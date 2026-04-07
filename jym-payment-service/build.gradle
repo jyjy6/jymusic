@@ -31,6 +31,10 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 
+	// Resilience4j — Circuit Breaker & Retry
+	implementation 'io.github.resilience4j:resilience4j-spring-boot3:2.3.0'
+	implementation 'org.springframework.boot:spring-boot-starter-aop'
+
 	// Kafka
 	implementation 'org.springframework.kafka:spring-kafka'
 	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.5'
