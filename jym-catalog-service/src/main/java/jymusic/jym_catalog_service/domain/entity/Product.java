@@ -61,4 +61,24 @@ public class Product extends BaseTimeEntity {
     public void softDelete() {
         this.isAvailable = false;
     }
+
+    /**
+     * 재고 예약 (차감).
+     * 재고가 부족하면 false 반환.
+     */
+    public boolean reserveStock(int quantity) {
+        if (this.stockQuantity < quantity) {
+            return false;
+        }
+        this.stockQuantity -= quantity;
+        return true;
+    }
+
+    /**
+     * 재고 복원 (보상 트랜잭션).
+     * 결제 실패/취소 시 예약된 재고를 되돌립니다.
+     */
+    public void releaseStock(int quantity) {
+        this.stockQuantity += quantity;
+    }
 }

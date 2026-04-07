@@ -18,6 +18,7 @@ public class OrderClient {
 
     private final RestClient orderRestClient;
 
+    // ✅ 유지 — 결제 준비 시 주문 정보 조회 (동기 REST)
     @SuppressWarnings("unchecked")
     public OrderInfo getOrderInfo(Long orderId, String memberId) {
         try {
@@ -44,17 +45,9 @@ public class OrderClient {
         }
     }
 
-    public void updateOrderStatus(Long orderId, String newStatus) {
-        try {
-            orderRestClient.put()
-                    .uri("/api/v1/orders/{orderId}/status", orderId)
-                    .body(Map.of("status", newStatus))
-                    .retrieve()
-                    .toBodilessEntity();
-        } catch (Exception e) {
-            log.error("주문 상태 업데이트 실패: orderId={}, status={}", orderId, newStatus, e);
-        }
-    }
+    // ❌ 제거 — Kafka 이벤트(PAYMENT_COMPLETED / PAYMENT_CANCELLED)로 대체됨
+    // @Deprecated
+    // public void updateOrderStatus(Long orderId, String newStatus) { ... }
 
     public record OrderInfo(Long orderId, String status, BigDecimal totalAmount) {}
 }

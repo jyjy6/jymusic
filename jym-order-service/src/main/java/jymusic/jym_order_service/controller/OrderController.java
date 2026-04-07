@@ -42,7 +42,8 @@ public class OrderController {
         return ResponseEntity.ok(orderService.getOrderDetail(Long.parseLong(memberId), orderId));
     }
 
-    // payment-service가 결제 완료·취소 후 주문 상태를 동기적으로 업데이트하기 위한 내부 엔드포인트
+    // ※ Kafka 이벤트 기반으로 대체되었으므로 일반 서비스→서비스 호출에는 사용하지 않음
+    // 관리자용 수동 상태 변경 용도로 유지
     @PutMapping("/{orderId}/status")
     public ResponseEntity<Void> updateStatus(
             @PathVariable Long orderId,

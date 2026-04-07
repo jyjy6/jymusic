@@ -10,6 +10,12 @@ import jymusic.jym_payment_service.dto.request.PaymentCancelRequest;
 import jymusic.jym_payment_service.dto.request.PaymentConfirmRequest;
 import jymusic.jym_payment_service.dto.request.PaymentPrepareRequest;
 import jymusic.jym_payment_service.dto.response.*;
+import jymusic.jym_payment_service.event.common.EventTypes;
+import jymusic.jym_payment_service.event.common.KafkaTopics;
+import jymusic.jym_payment_service.event.payload.PaymentCancelledPayload;
+import jymusic.jym_payment_service.event.payload.PaymentCompletedPayload;
+import jymusic.jym_payment_service.event.payload.PaymentFailedPayload;
+import jymusic.jym_payment_service.event.publisher.EventPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -28,12 +34,14 @@ public class PaymentService {
     private final PaymentPrepareRepository paymentPrepareRepository;
     private final OrderClient orderClient;
     private final TossPaymentsClient tossClient;
+    private final EventPublisher eventPublisher;
 
     @Transactional
     public PaymentPrepareResponse prepare(Long memberId, PaymentPrepareRequest request) {
         OrderClient.OrderInfo orderInfo = orderClient.getOrderInfo(request.getOrderId(), String.valueOf(memberId));
 
-        if (!"PENDING".equals(orderInfo.status())) {
+        // Saga 도입: PENDING 또는 STOCK_RESERVED 상태 모두 결제 허용
+        if (!"PENDING".equals(orderInfo.status()) && !"STOCK_RESERVED".equals(orderInfo.status())) {
             throw new GlobalException("결제 대기 상태의 주문만 결제할 수 있습니다.", "ERR_INVALID_ORDER_STATUS");
         }
 
@@ -71,26 +79,55 @@ public class PaymentService {
             throw new GlobalException("결제 금액이 일치하지 않습니다.", "ERR_AMOUNT_MISMATCH");
         }
 
-        TossPaymentsClient.TossConfirmResult tossResult =
-                tossClient.confirmPayment(request.getPaymentKey(), request.getOrderId(), request.getAmount());
+        try {
+            TossPaymentsClient.TossConfirmResult tossResult =
+                    tossClient.confirmPayment(request.getPaymentKey(), request.getOrderId(), request.getAmount());
 
-        PaymentMethod method = PaymentMethod.valueOf(tossResult.method());
+            PaymentMethod method = PaymentMethod.valueOf(tossResult.method());
 
-        Payment payment = Payment.builder()
-                .orderId(request.getOrderId())
-                .memberId(memberId)
-                .paymentKey(request.getPaymentKey())
-                .method(method)
-                .amount(request.getAmount())
-                .status(PaymentStatus.PENDING)
-                .build();
-        payment.markSuccess(tossResult.pgTransactionId(), LocalDateTime.now());
+            Payment payment = Payment.builder()
+                    .orderId(request.getOrderId())
+                    .memberId(memberId)
+                    .paymentKey(request.getPaymentKey())
+                    .method(method)
+                    .amount(request.getAmount())
+                    .status(PaymentStatus.PENDING)
+                    .build();
+            payment.markSuccess(tossResult.pgTransactionId(), LocalDateTime.now());
 
-        Payment savedPayment = paymentRepository.save(payment);
-        paymentPrepareRepository.deleteByOrderId(request.getOrderId());
-        orderClient.updateOrderStatus(request.getOrderId(), "PAID");
+            Payment savedPayment = paymentRepository.save(payment);
+            paymentPrepareRepository.deleteByOrderId(request.getOrderId());
 
-        return PaymentConfirmResponse.from(savedPayment);
+            // [CHANGED] REST 호출 → Kafka 이벤트 발행
+            eventPublisher.publish(
+                    KafkaTopics.PAYMENT_EVENTS,
+                    request.getOrderId().toString(),
+                    EventTypes.PAYMENT_COMPLETED,
+                    PaymentCompletedPayload.builder()
+                            .orderId(request.getOrderId())
+                            .memberId(memberId)
+                            .paymentKey(request.getPaymentKey())
+                            .amount(request.getAmount())
+                            .method(tossResult.method())
+                            .build()
+            );
+
+            return PaymentConfirmResponse.from(savedPayment);
+
+        } catch (GlobalException e) {
+            // Toss API 거절 (카드 한도 초과, 유효하지 않은 카드 등)
+            eventPublisher.publish(
+                    KafkaTopics.PAYMENT_EVENTS,
+                    request.getOrderId().toString(),
+                    EventTypes.PAYMENT_FAILED,
+                    PaymentFailedPayload.builder()
+                            .orderId(request.getOrderId())
+                            .memberId(memberId)
+                            .reason(e.getMessage())
+                            .build()
+            );
+            throw e;  // 프론트에 에러 응답
+        }
     }
 
     @Transactional
@@ -108,7 +145,19 @@ public class PaymentService {
 
         tossClient.cancelPayment(request.getPaymentKey(), request.getCancelReason(), request.getCancelAmount());
         payment.markCancelled(LocalDateTime.now());
-        orderClient.updateOrderStatus(payment.getOrderId(), "CANCELLED");
+
+        // [CHANGED] REST 호출 → Kafka 이벤트 발행
+        eventPublisher.publish(
+                KafkaTopics.PAYMENT_EVENTS,
+                payment.getOrderId().toString(),
+                EventTypes.PAYMENT_CANCELLED,
+                PaymentCancelledPayload.builder()
+                        .orderId(payment.getOrderId())
+                        .memberId(memberId)
+                        .paymentKey(payment.getPaymentKey())
+                        .cancelReason(request.getCancelReason())
+                        .build()
+        );
 
         return PaymentCancelResponse.from(payment);
     }

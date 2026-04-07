@@ -14,10 +14,28 @@ export interface OrderItemDetail {
   quantity: number
 }
 
+export type OrderStatus =
+  | 'PENDING'          // 주문 처리 중
+  | 'STOCK_RESERVED'   // 결제 대기 (재고 확보 완료)
+  | 'PAID'             // 결제 완료
+  | 'SHIPPED'          // 배송 중
+  | 'COMPLETED'        // 구매 확정
+  | 'CANCELLED'        // 주문 취소
+
+// 상태별 표시 텍스트
+export const orderStatusLabels: Record<OrderStatus, string> = {
+  PENDING: '주문 처리 중',
+  STOCK_RESERVED: '결제 대기',
+  PAID: '결제 완료',
+  SHIPPED: '배송 중',
+  COMPLETED: '구매 확정',
+  CANCELLED: '주문 취소',
+}
+
 export interface OrderDetail {
   id: number
   totalAmount: number
-  status: string
+  status: OrderStatus
   items: OrderItemDetail[]
   createdAt: string
 }
