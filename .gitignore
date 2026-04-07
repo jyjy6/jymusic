@@ -50,3 +50,7 @@ application-*.yml
 *.pub
 *.jks
 *.p12
+
+
+
+developer_assessment.md

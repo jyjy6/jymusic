@@ -11,6 +11,11 @@ import jymusic.jym_order_service.dto.request.OrderCreateRequest;
 import jymusic.jym_order_service.dto.request.OrderItemRequest;
 import jymusic.jym_order_service.dto.response.OrderDetailResponse;
 import jymusic.jym_order_service.dto.response.OrderResponse;
+import jymusic.jym_order_service.event.common.EventTypes;
+import jymusic.jym_order_service.event.common.KafkaTopics;
+import jymusic.jym_order_service.event.payload.OrderCreatedPayload;
+import jymusic.jym_order_service.event.payload.OrderItemPayload;
+import jymusic.jym_order_service.event.publisher.EventPublisher;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -28,26 +33,26 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final CartRepository cartRepository;
     private final CatalogClient catalogClient;
+    private final EventPublisher eventPublisher;
 
     @Transactional
     public OrderResponse createOrder(Long memberId, OrderCreateRequest request) {
         record ItemInfo(CatalogClient.ProductInfo info, int quantity) {}
 
+        // 1. 상품 정보 조회 (REST → catalog-service)
+        //    ※ 재고 "검증"만 수행, 차감은 하지 않음 (Kafka 이벤트로 처리)
         List<ItemInfo> infos = new ArrayList<>();
         BigDecimal totalAmount = BigDecimal.ZERO;
 
         for (OrderItemRequest itemReq : request.getItems()) {
             CatalogClient.ProductInfo info = catalogClient.getProductInfo(itemReq.getProductId());
-            if (info.stockQuantity() < itemReq.getQuantity()) {
-                throw new GlobalException(
-                        "상품 '" + info.title() + "'의 재고가 부족합니다.",
-                        "ERR_INSUFFICIENT_STOCK"
-                );
-            }
+            // 기본 유효성만 체크 (상품 존재 여부, 판매 가능 여부)
+            // ※ 재고 수량 최종 검증은 catalog-service가 이벤트 소비 시 수행
             totalAmount = totalAmount.add(info.price().multiply(BigDecimal.valueOf(itemReq.getQuantity())));
             infos.add(new ItemInfo(info, itemReq.getQuantity()));
         }
 
+        // 2. 주문 생성 (PENDING 상태)
         Order order = Order.builder()
                 .memberId(memberId)
                 .totalAmount(totalAmount)
@@ -67,12 +72,43 @@ public class OrderService {
 
         Order savedOrder = orderRepository.save(order);
 
+        // 3. 장바구니 비우기
         cartRepository.findByMemberId(memberId).ifPresent(cart -> {
             cart.getItems().clear();
             cartRepository.save(cart);
         });
 
+        // 4. [NEW] ORDER_CREATED 이벤트 발행
+        publishOrderCreatedEvent(savedOrder);
+
         return OrderResponse.from(savedOrder);
+    }
+
+    /**
+     * 주문 생성 이벤트 발행.
+     * Kafka로 발행하여 catalog-service가 재고를 예약하도록 트리거.
+     */
+    private void publishOrderCreatedEvent(Order order) {
+        OrderCreatedPayload payload = OrderCreatedPayload.builder()
+                .orderId(order.getId())
+                .memberId(order.getMemberId())
+                .totalAmount(order.getTotalAmount())
+                .items(order.getItems().stream()
+                        .map(item -> OrderItemPayload.builder()
+                                .productId(item.getProductId())
+                                .productTitle(item.getProductTitle())
+                                .unitPrice(item.getUnitPrice())
+                                .quantity(item.getQuantity())
+                                .build())
+                        .toList())
+                .build();
+
+        eventPublisher.publish(
+                KafkaTopics.ORDER_EVENTS,
+                order.getId().toString(),  // Kafka key = orderId
+                EventTypes.ORDER_CREATED,
+                payload
+        );
     }
 
     public List<OrderResponse> getMyOrders(Long memberId) {
@@ -97,7 +133,7 @@ public class OrderService {
     public void updateOrderStatus(Long orderId, OrderStatus newStatus) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new GlobalException("주문을 찾을 수 없습니다.", "ERR_ORDER_NOT_FOUND", HttpStatus.NOT_FOUND));
-        order.updateStatus(newStatus);
+        order.transitionTo(newStatus);
     }
 
 }

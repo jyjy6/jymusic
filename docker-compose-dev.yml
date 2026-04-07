@@ -14,6 +14,65 @@ services:
       - jym-network
 
   # ──────────────────────────────────────────
+  # Kafka Infrastructure
+  # ──────────────────────────────────────────
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.7.1
+    container_name: jym-zookeeper
+    restart: unless-stopped
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+      - zookeeper_log:/var/lib/zookeeper/log
+    networks:
+      - jym-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.7.1
+    container_name: jym-kafka
+    restart: unless-stopped
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"       # 호스트 접근용 (로컬 개발)
+      - "29092:29092"     # Docker 내부 접근용
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1        # dev 단일 브로커
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"          # 수동 토픽 관리
+      KAFKA_LOG_RETENTION_HOURS: 168                    # 7일 보관
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    networks:
+      - jym-network
+
+  # Kafka UI — 개발 중 토픽/메시지 모니터링용
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: jym-kafka-ui
+    restart: unless-stopped
+    depends_on:
+      - kafka
+    ports:
+      - "8090:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: jym-local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+    networks:
+      - jym-network
+
+  # ──────────────────────────────────────────
   # Backend Services
   # DB 설정은 각 서비스의 application-dev.properties 사용
   # Redis만 Docker 내부 서비스명으로 오버라이드
@@ -40,8 +99,12 @@ services:
       dockerfile: Dockerfile.dev
     container_name: jym-catalog-service
     restart: unless-stopped
+    environment:
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
     ports:
       - "8082:8080"
+    depends_on:
+      - kafka
     networks:
       - jym-network
 
@@ -51,8 +114,13 @@ services:
       dockerfile: Dockerfile.dev
     container_name: jym-order-service
     restart: unless-stopped
+    environment:
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
     ports:
       - "8083:8080"
+    depends_on:
+      - redis
+      - kafka
     networks:
       - jym-network
 
@@ -62,8 +130,12 @@ services:
       dockerfile: Dockerfile.dev
     container_name: jym-payment-service
     restart: unless-stopped
+    environment:
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
     ports:
       - "8084:8080"
+    depends_on:
+      - kafka
     networks:
       - jym-network
 
@@ -114,6 +186,9 @@ services:
 # ──────────────────────────────────────────
 volumes:
   redis_data:
+  zookeeper_data:
+  zookeeper_log:
+  kafka_data:
 
 networks:
   jym-network:
