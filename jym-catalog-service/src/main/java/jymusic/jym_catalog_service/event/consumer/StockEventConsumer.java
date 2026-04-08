@@ -74,6 +74,14 @@ public class StockEventConsumer {
         List<ReservedItem> reservedItems = new ArrayList<>();
 
         for (OrderItemPayload item : payload.getItems()) {
+            // ========================================================================
+            // [추후 변경 예정] 비관적 락(Pessimistic Lock) 적용
+            // ========================================================================
+            // TODO: 대량의 트래픽(예: 티켓팅, 타임세일) 시 동시성 문제(Lost Update)를 방지하기 위해 
+            // 아래의 일반 findById 대신 비관적 락이 걸린 쿼리를 사용해야 합니다.
+            //
+            // Product product = productRepository.findByIdWithPessimisticLock(item.getProductId())
+            //         .orElse(null);
             Product product = productRepository.findById(item.getProductId())
                     .orElse(null);
 
