@@ -38,19 +38,19 @@ services:
     depends_on:
       - zookeeper
     ports:
-      - "9092:9092"       # 호스트 접근용 (로컬 개발)
-      - "29092:29092"     # Docker 내부 접근용
+      - "9092:9092" # 호스트 접근용 (로컬 개발)
+      - "29092:29092" # Docker 내부 접근용
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1        # dev 단일 브로커
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1 # dev 단일 브로커
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"          # 수동 토픽 관리
-      KAFKA_LOG_RETENTION_HOURS: 168                    # 7일 보관
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LOG_RETENTION_HOURS: 168 # 7일 보관
     volumes:
       - kafka_data:/var/lib/kafka/data
     networks:

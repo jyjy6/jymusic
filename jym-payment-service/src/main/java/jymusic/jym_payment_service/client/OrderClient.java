@@ -30,6 +30,8 @@ public class OrderClient {
     public OrderInfo getOrderInfo(Long orderId, String memberId) {
         Map<String, Object> response = orderRestClient.get()
                 .uri("/api/v1/orders/{orderId}", orderId)
+                .header("X-User-Id", memberId)
+                .header("X-User-Role", "ROLE_USER")
                 .retrieve()
                 .onStatus(HttpStatusCode::is4xxClientError, (req, res) -> {
                     throw new GlobalException("주문을 찾을 수 없습니다.", "ERR_ORDER_NOT_FOUND", HttpStatus.NOT_FOUND);

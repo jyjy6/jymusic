@@ -1,6 +1,6 @@
 package jymusic.jym_order_service.event.consumer;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import jymusic.jym_order_service.domain.entity.Order;
 import jymusic.jym_order_service.domain.entity.OrderStatus;
 import jymusic.jym_order_service.domain.repository.OrderRepository;
