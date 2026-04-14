@@ -30,4 +30,12 @@ public class PaymentPrepare extends BaseTimeEntity {
     public boolean isExpired() {
         return LocalDateTime.now().isAfter(expiresAt);
     }
+
+    public void updateAmount(BigDecimal amount) {
+        this.amount = amount;
+    }
+
+    public void updateExpiresAt(LocalDateTime expiresAt) {
+        this.expiresAt = expiresAt;
+    }
 }

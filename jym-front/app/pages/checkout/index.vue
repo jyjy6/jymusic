@@ -186,19 +186,21 @@ async function handlePay() {
     })
 
     const { clientKey, amount } = prepareRes.data
-    // Toss Payments SDK 동적 로드 (패키지 설치 후 활성화: npm install @tosspayments/tosspayments-sdk)
+
+    if (!clientKey || clientKey.startsWith('test_ck_REPLACE') || clientKey.startsWith('test_sk_REPLACE')) {
+      throw new Error('Toss Payments 클라이언트 키가 설정되지 않았습니다. 서버의 toss.payments.client-key 값을 확인해주세요.')
+    }
+
     const tossModule = await import(/* @vite-ignore */ '@tosspayments/tosspayments-sdk').catch(() => null)
     if (!tossModule) {
-      throw new Error('Toss Payments SDK를 로드하지 못했습니다.')
+      throw new Error('Toss Payments SDK를 로드하지 못했습니다. (npm install @tosspayments/tosspayments-sdk)')
     }
     const tossPayments = await tossModule.loadTossPayments(clientKey)
 
-    // TossPaymentsSDK → payment() → Payment 객체에서 requestPayment 호출
     const payment = tossPayments.payment({
       customerKey: `member_${authStore.user?.id ?? 'anonymous'}`,
     })
 
-    // 우리 내부 PaymentMethod → Toss SDK method 문자열 변환
     const tossMethodMap: Record<string, string> = {
       CARD: '카드',
       VIRTUAL_ACCOUNT: '계좌이체',
@@ -215,8 +217,10 @@ async function handlePay() {
       successUrl: `${window.location.origin}/checkout/success?orderId=${order.value.id}`,
       failUrl: `${window.location.origin}/checkout/fail?orderId=${order.value.id}`,
     })
-  } catch {
-    showToast('결제 준비에 실패했습니다.', 'error')
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '결제 준비에 실패했습니다.'
+    showToast(message, 'error')
+  } finally {
     isPaying.value = false
   }
 }

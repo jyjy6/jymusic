@@ -1,6 +1,6 @@
 package jymusic.jym_catalog_service.event.consumer;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import jymusic.jym_catalog_service.domain.entity.*;
 import jymusic.jym_catalog_service.domain.repository.ProductRepository;
 import jymusic.jym_catalog_service.domain.repository.StockReservationRepository;

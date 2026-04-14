@@ -49,14 +49,17 @@ public class PaymentService {
             throw new GlobalException("결제 금액이 주문 금액과 다릅니다.", "ERR_AMOUNT_MISMATCH");
         }
 
-        paymentPrepareRepository.findByOrderId(request.getOrderId())
-                .ifPresent(existing -> paymentPrepareRepository.delete(existing));
-
-        PaymentPrepare prepare = PaymentPrepare.builder()
-                .orderId(request.getOrderId())
-                .amount(request.getAmount())
-                .expiresAt(LocalDateTime.now().plusMinutes(30))
-                .build();
+        PaymentPrepare prepare = paymentPrepareRepository.findByOrderId(request.getOrderId())
+                .map(existing -> {
+                    existing.updateAmount(request.getAmount());
+                    existing.updateExpiresAt(LocalDateTime.now().plusMinutes(30));
+                    return existing;
+                })
+                .orElseGet(() -> PaymentPrepare.builder()
+                        .orderId(request.getOrderId())
+                        .amount(request.getAmount())
+                        .expiresAt(LocalDateTime.now().plusMinutes(30))
+                        .build());
         paymentPrepareRepository.save(prepare);
 
         return PaymentPrepareResponse.builder()
