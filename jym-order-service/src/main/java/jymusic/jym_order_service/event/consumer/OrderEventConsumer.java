@@ -39,11 +39,18 @@ public class OrderEventConsumer {
     // Stock Events 소비
     // ──────────────────────────────────────────
 
+    /**
+     * @Transactional 을 최상위 메서드에 배치하는 이유:
+     * Spring AOP Proxy는 외부로부터의 호출만 인터셉트하므로,
+     * 동일 클래스 내의 내부 호출(self-invocation)에서는 @Transactional 이 무시됩니다.
+     * 따라서 Kafka로부터 호출되는 이 메서드에 트랜잭션을 설정합니다.
+     */
     @KafkaListener(
         topics = KafkaTopics.STOCK_EVENTS,
         groupId = "jym-order-service-group",
         containerFactory = "kafkaListenerContainerFactory"
     )
+    @Transactional
     public void handleStockEvent(ConsumerRecord<String, EventEnvelope<?>> record) {
         EventEnvelope<?> envelope = record.value();
         log.info("Stock 이벤트 수신: type={}, orderId={}",
@@ -56,8 +63,7 @@ public class OrderEventConsumer {
         }
     }
 
-    @Transactional
-    protected void handleStockReserved(EventEnvelope<?> envelope) {
+    private void handleStockReserved(EventEnvelope<?> envelope) {
         StockReservedPayload payload = convertPayload(envelope, StockReservedPayload.class);
 
         orderRepository.findById(payload.getOrderId()).ifPresentOrElse(
@@ -76,8 +82,7 @@ public class OrderEventConsumer {
         );
     }
 
-    @Transactional
-    protected void handleStockReservationFailed(EventEnvelope<?> envelope) {
+    private void handleStockReservationFailed(EventEnvelope<?> envelope) {
         StockReservationFailedPayload payload =
                 convertPayload(envelope, StockReservationFailedPayload.class);
 
@@ -105,6 +110,7 @@ public class OrderEventConsumer {
         groupId = "jym-order-service-group",
         containerFactory = "kafkaListenerContainerFactory"
     )
+    @Transactional
     public void handlePaymentEvent(ConsumerRecord<String, EventEnvelope<?>> record) {
         EventEnvelope<?> envelope = record.value();
         log.info("Payment 이벤트 수신: type={}, orderId={}",
@@ -118,8 +124,7 @@ public class OrderEventConsumer {
         }
     }
 
-    @Transactional
-    protected void handlePaymentCompleted(EventEnvelope<?> envelope) {
+    private void handlePaymentCompleted(EventEnvelope<?> envelope) {
         PaymentCompletedPayload payload = convertPayload(envelope, PaymentCompletedPayload.class);
 
         orderRepository.findById(payload.getOrderId()).ifPresentOrElse(
@@ -136,8 +141,7 @@ public class OrderEventConsumer {
         );
     }
 
-    @Transactional
-    protected void handlePaymentFailed(EventEnvelope<?> envelope) {
+    private void handlePaymentFailed(EventEnvelope<?> envelope) {
         PaymentFailedPayload payload = convertPayload(envelope, PaymentFailedPayload.class);
 
         orderRepository.findById(payload.getOrderId()).ifPresentOrElse(
@@ -153,8 +157,7 @@ public class OrderEventConsumer {
         );
     }
 
-    @Transactional
-    protected void handlePaymentCancelled(EventEnvelope<?> envelope) {
+    private void handlePaymentCancelled(EventEnvelope<?> envelope) {
         PaymentCancelledPayload payload = convertPayload(envelope, PaymentCancelledPayload.class);
 
         orderRepository.findById(payload.getOrderId()).ifPresentOrElse(
