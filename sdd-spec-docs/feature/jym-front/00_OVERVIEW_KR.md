@@ -32,6 +32,10 @@ http://localhost:8080  ←  jym-api-gateway
 | `/products/[id]` | 상품 상세 | 불필요 | GET `/api/v1/products/{id}` | `02_PAGES_CATALOG_KR.md` |
 | `/admin/products/new` | 상품 등록 | **ROLE_ADMIN** | POST `/api/v1/products` | `03_PAGES_CATALOG_ADMIN_KR.md` |
 | `/admin/products/[id]/edit` | 상품 수정 | **ROLE_ADMIN** | PUT `/api/v1/products/{id}` | `03_PAGES_CATALOG_ADMIN_KR.md` |
+| `/me/orders` | 내 주문 목록 | **필요** | GET `/api/v1/orders` + SSE 구독 | `07_PAGES_MY_ORDERS_KR.md` |
+| `/me/orders/[id]` | 내 주문 상세 | **필요** | GET `/api/v1/orders/{id}` + SSE 구독 | `07_PAGES_MY_ORDERS_KR.md` |
+| `/admin/orders` | 전체 주문 검색·목록 | **ROLE_ADMIN** | GET `/api/v1/admin/orders` + SSE 구독 | `08_PAGES_ADMIN_ORDERS_KR.md` |
+| `/admin/orders/[id]` | 주문 상세·상태 변경 | **ROLE_ADMIN** | GET/PATCH `/api/v1/admin/orders/{id}` | `08_PAGES_ADMIN_ORDERS_KR.md` |
 
 ## 4. 스펙 파일 구조
 
@@ -40,6 +44,9 @@ http://localhost:8080  ←  jym-api-gateway
 | `01_PAGES_AUTH_KR.md` | 메인, 회원가입, 로그인, 내 프로필, Axios/Pinia/미들웨어 공통 설정 |
 | `02_PAGES_CATALOG_KR.md` | 상품 목록, 상품 상세, 카탈로그 타입/컴포저블/컴포넌트 |
 | `03_PAGES_CATALOG_ADMIN_KR.md` | 상품 등록/수정, Presigned URL 업로드, FileUpload 컴포넌트, 관리자 미들웨어 |
+| `07_PAGES_MY_ORDERS_KR.md` | 내 주문 목록/상세, OrderStatusStepper, 상태 탭 필터, 주문 취소 |
+| `08_PAGES_ADMIN_ORDERS_KR.md` | 운영자 주문 검색/페이징, 상태 변경 패널, Pagination 컴포넌트 |
+| `09_SSE_NOTIFICATION_CLIENT_KR.md` | EventSource 싱글턴 매니저, NotificationBell, Pinia notifications 스토어 |
 
 ## 5. 인증 흐름
 
