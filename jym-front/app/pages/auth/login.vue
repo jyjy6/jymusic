@@ -62,6 +62,9 @@
           </button>
         </form>
 
+        <!-- 소셜 로그인 -->
+        <SocialLoginButtons />
+
         <p class="text-center text-sm text-gray-500 mt-6">
           아직 계정이 없으신가요?
           <NuxtLink to="/auth/register" class="text-indigo-600 hover:text-indigo-700 hover:underline font-medium">
@@ -76,6 +79,7 @@
 <script setup lang="ts">
 import type { AxiosInstance } from 'axios'
 import { useAuthStore, type AuthUser } from '~/stores/auth'
+import SocialLoginButtons from '~/components/auth/SocialLoginButtons.vue'
 
 definePageMeta({
   layout: 'default',

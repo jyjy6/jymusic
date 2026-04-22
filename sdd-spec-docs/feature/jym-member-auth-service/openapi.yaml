@@ -90,6 +90,81 @@ paths:
         "401":
           $ref: "#/components/responses/ErrorResponse"
 
+  /auth/oauth2/{provider}:
+    get:
+      tags:
+        - 인증/권한
+      summary: 소셜 로그인 시작
+      description: |
+        지정된 OAuth Provider의 인가 화면으로 리다이렉트합니다.
+        지원 Provider: `google`, `kakao`
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [google, kakao]
+          description: OAuth Provider 이름 (소문자)
+      responses:
+        "302":
+          description: Provider 인가 URL로 리다이렉트
+          headers:
+            Location:
+              description: OAuth Provider 인가 URL
+              schema:
+                type: string
+                example: https://accounts.google.com/o/oauth2/v2/auth?client_id=...
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /auth/oauth2/callback/{provider}:
+    get:
+      tags:
+        - 인증/권한
+      summary: OAuth 콜백 처리
+      description: |
+        OAuth Provider로부터 Authorization Code를 수신하여 처리합니다.
+        1. code로 Provider Access Token 교환
+        2. Provider UserInfo 조회
+        3. 기존 회원이면 로그인, 신규면 자동 가입
+        4. JWT(AT/RT) 발급 후 프론트엔드로 리다이렉트
+        - Refresh Token은 HttpOnly Cookie로 설정됩니다.
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [google, kakao]
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+          description: OAuth Authorization Code
+        - name: state
+          in: query
+          required: true
+          schema:
+            type: string
+          description: CSRF 방지용 State 파라미터
+      responses:
+        "302":
+          description: 프론트엔드 성공 페이지로 리다이렉트 (accessToken은 query parameter로 전달)
+          headers:
+            Location:
+              description: "프론트엔드 OAuth 성공 URL (예: http://localhost:3000/auth/oauth2/success?accessToken=eyJ...)"
+              schema:
+                type: string
+            Set-Cookie:
+              description: Refresh Token이 HttpOnly Cookie로 설정됩니다.
+              schema:
+                type: string
+                example: refreshToken=eyJ...; Path=/; HttpOnly; Max-Age=604800
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+
   /members/me:
     get:
       tags:
@@ -183,6 +258,11 @@ components:
           description: 사용자의 시스템 권한 수준
           enum: [ROLE_ADMIN, ROLE_USER]
           example: ROLE_USER
+        authProvider:
+          type: string
+          description: 로그인 출처 (LOCAL, GOOGLE, KAKAO)
+          enum: [LOCAL, GOOGLE, KAKAO]
+          example: LOCAL
 
     ErrorResponse:
       type: object

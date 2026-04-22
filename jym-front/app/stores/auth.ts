@@ -1,12 +1,15 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
+export type AuthProvider = 'LOCAL' | 'GOOGLE' | 'KAKAO'
+
 export interface AuthUser {
   id: number
   username: string
   nickname: string
   role: string
   email?: string
+  authProvider?: AuthProvider
 }
 
 export const useAuthStore = defineStore('auth', () => {
