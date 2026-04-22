@@ -13,14 +13,14 @@ Jymusic은 음악 앨범을 판매하는 이커머스 서비스입니다.
 
 ## 기술 스택
 
-| 구분        | 기술                                                                                       |
-| ----------- | ------------------------------------------------------------------------------------------ |
-| Frontend    | Nuxt 4 (Vue 3, TypeScript, Tailwind CSS)                                                   |
+| 구분        | 기술                                                                                                |
+| ----------- | --------------------------------------------------------------------------------------------------- |
+| Frontend    | Nuxt 4 (Vue 3, TypeScript, Tailwind CSS)                                                            |
 | Backend     | Spring Boot 3.x / 4.x (Java 21), JPA(CUD), MyBatis(R), Spring Cloud, Kafka, Redis, LangChain4j, RAG |
-| API Gateway | Spring Cloud Gateway (WebMvc->WebFlux 비동기 분산처리)                                        |
-| Database    | MySQL (서비스별 독립 DB), Pinecone                                                         |
-| 인증        | JWT (Stateless)                                                                            |
-| 인프라      | Docker / Docker Compose                                                                    |
+| API Gateway | Spring Cloud Gateway (WebMvc->WebFlux 비동기 분산처리)                                              |
+| Database    | MySQL (서비스별 독립 DB), Pinecone                                                                  |
+| 인증        | JWT (Stateless), OAuth2(Google, Kakao)                                                              |
+| 인프라      | Docker / Docker Compose                                                                             |
 
 ---
 
@@ -71,21 +71,18 @@ jymusic/
 ### 핵심 동작 단계별 흐름 (Saga & Circuit Breaker)
 
 **[Phase 1] 주문 준비 (⚡ 동기 호출 & Circuit Breaker)**
+
 1. **Frontend** ➔ `Order Service` : 주문 생성 요청
 2. `Order Service` ➔ `Catalog Service` : 상품 유효성/단가 확인 (REST API)
-   * ⚡ **Circuit Breaker 보호 구간**: Catalog 장애 시 빠른 에러(Fast Fail)를 반환하여 Order의 스레드 고갈 방지
+   - ⚡ **Circuit Breaker 보호 구간**: Catalog 장애 시 빠른 에러(Fast Fail)를 반환하여 Order의 스레드 고갈 방지
 3. `Order Service` : 주문 임시 생성 및 저장 (`PENDING` 상태)
 
-**[Phase 2] 재고 예약 (🔄 비동기 Kafka 이벤트 통신)**
-4. `Order Service` ➔ **Kafka** : `ORDER_CREATED` 이벤트 발행
-5. **Kafka** ➔ `Catalog Service` : 이벤트 소비 및 재고 차감 수행
-6. `Catalog Service` ➔ **Kafka** : `STOCK_RESERVED` 이벤트 발행 (재고 확보 완료)
-7. **Kafka** ➔ `Order Service` : 이벤트 소비 및 상태 업데이트 (`STOCK_RESERVED`)
+**[Phase 2] 재고 예약 (🔄 비동기 Kafka 이벤트 통신)** 4. `Order Service` ➔ **Kafka** : `ORDER_CREATED` 이벤트 발행 5. **Kafka** ➔ `Catalog Service` : 이벤트 소비 및 재고 차감 수행 6. `Catalog Service` ➔ **Kafka** : `STOCK_RESERVED` 이벤트 발행 (재고 확보 완료) 7. **Kafka** ➔ `Order Service` : 이벤트 소비 및 상태 업데이트 (`STOCK_RESERVED`)
 
-**[Phase 3] 결제 완료 (⚡ 동기 호출 + 🔄 비동기 Kafka 통신)**
-8. **Frontend** ➔ `Payment Service` : 결제 준비 요청
-9. `Payment Service` ➔ `Order Service` : 결제할 주문 금액 검증 (REST API)
-   * ⚡ **Circuit Breaker 보호 구간**: 결제 금액 검증과 같은 필수 교차 통신을 보호
+**[Phase 3] 결제 완료 (⚡ 동기 호출 + 🔄 비동기 Kafka 통신)** 8. **Frontend** ➔ `Payment Service` : 결제 준비 요청 9. `Payment Service` ➔ `Order Service` : 결제할 주문 금액 검증 (REST API)
+
+- ⚡ **Circuit Breaker 보호 구간**: 결제 금액 검증과 같은 필수 교차 통신을 보호
+
 10. `Payment Service` : 외부 PG(Toss) 결제 최종 승인 및 결제 내역 DB 저장 완료
 11. `Payment Service` ➔ **Kafka** : `PAYMENT_COMPLETED` 이벤트 발행
 12. **Kafka** ➔ `Order Service` : 이벤트 소비 및 최종 주문 상태 업데이트 (`PAID`)
@@ -93,13 +90,13 @@ jymusic/
 **[Phase 4] 보상 트랜잭션 (⚠️ 장애 상황에서의 자동 롤백 / Saga)**
 Kafka를 활용하여 어느 한쪽의 로직이 실패해도 다른 도메인에 롤백 이벤트가 자연스럽게 전파되도록 구현되어 있습니다.
 
-* **상황 A (재고 부족 등 취소)**
-  * `Catalog Service`가 재고 부족 감지 시 ➔ **Kafka**에 `STOCK_RESERVATION_FAILED` 이벤트 발행
-  * `Order Service`가 이를 소비하여 생성되었던 주문을 `CANCELLED` 처리
-* **상황 B (결제 실패 또는 취소)**
-  * `Payment Service`가 승인 실패 시 ➔ **Kafka**에 `PAYMENT_FAILED` 이벤트 발행
-  * `Order Service`가 이벤트를 소비하여 주문 최종 **취소 처리 (`CANCELLED`)**
-  * `Catalog Service`가 이벤트를 소비하여 이미 차감했던 **재고 원상 복구 (+)**
+- **상황 A (재고 부족 등 취소)**
+  - `Catalog Service`가 재고 부족 감지 시 ➔ **Kafka**에 `STOCK_RESERVATION_FAILED` 이벤트 발행
+  - `Order Service`가 이를 소비하여 생성되었던 주문을 `CANCELLED` 처리
+- **상황 B (결제 실패 또는 취소)**
+  - `Payment Service`가 승인 실패 시 ➔ **Kafka**에 `PAYMENT_FAILED` 이벤트 발행
+  - `Order Service`가 이벤트를 소비하여 주문 최종 **취소 처리 (`CANCELLED`)**
+  - `Catalog Service`가 이벤트를 소비하여 이미 차감했던 **재고 원상 복구 (+)**
 
 ---
 
