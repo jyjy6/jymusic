@@ -66,6 +66,79 @@ paths:
         "401":
           $ref: "#/components/responses/ErrorResponse"
 
+  /members/search:
+    get:
+      tags:
+        - 회원
+      summary: 회원 검색 (내부 연동용)
+      description: username/nickname 키워드 부분 일치로 회원을 최대 50건 조회합니다.
+      parameters:
+        - name: keyword
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 검색 성공
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/InternalMemberSummary"
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /members/batch:
+    get:
+      tags:
+        - 회원
+      summary: 회원 배치 조회 (내부 연동용)
+      description: ids 파라미터의 회원 ID 목록을 한 번에 조회합니다.
+      parameters:
+        - name: ids
+          in: query
+          required: true
+          schema:
+            type: array
+            items:
+              type: integer
+              format: int64
+          style: form
+          explode: false
+      responses:
+        "200":
+          description: 조회 성공
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/InternalMemberSummary"
+
+  /members/{memberId}:
+    get:
+      tags:
+        - 회원
+      summary: 회원 단건 조회 (내부 연동용)
+      parameters:
+        - name: memberId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InternalMemberSummary"
+        "404":
+          $ref: "#/components/responses/ErrorResponse"
+
 components:
   securitySchemes:
     bearerAuth:
@@ -141,6 +214,19 @@ components:
           description: 사용자의 시스템 권한 수준
           enum: [ROLE_ADMIN, ROLE_USER]
           example: ROLE_USER
+
+    InternalMemberSummary:
+      type: object
+      properties:
+        memberId:
+          type: integer
+          format: int64
+        username:
+          type: string
+        nickname:
+          type: string
+        email:
+          type: string
 
     ErrorResponse:
       type: object

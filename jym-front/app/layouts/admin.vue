@@ -24,6 +24,7 @@
             >
               관리
             </NuxtLink>
+            <NotificationBell />
             <template v-if="authStore.isLoggedIn">
               <span class="text-sm text-gray-500 hidden sm:block">
                 <span class="font-semibold text-gray-800">{{ authStore.user?.nickname }}</span> 님
@@ -67,6 +68,12 @@
           >
             Categories
           </NuxtLink>
+          <NuxtLink
+            to="/admin/orders"
+            :class="getTabClass('orders')"
+          >
+            Orders
+          </NuxtLink>
         </div>
       </div>
     </nav>
@@ -80,6 +87,7 @@
 <script setup lang="ts">
 import type { AxiosInstance } from 'axios'
 import AppToast from '~/components/AppToast.vue'
+import NotificationBell from '~/components/notifications/NotificationBell.vue'
 import { useAuthStore } from '~/stores/auth'
 
 const authStore = useAuthStore()
@@ -100,15 +108,17 @@ const handleLogout = async () => {
   }
 }
 
-const getTabClass = (type: 'products' | 'new' | 'categories') => {
+const getTabClass = (type: 'products' | 'new' | 'categories' | 'orders') => {
   const isNewPage = route.path === '/admin/products/new'
   const isCategoriesPage = route.path.startsWith('/admin/categories')
+  const isOrdersPage = route.path.startsWith('/admin/orders')
   const isProductsPage = route.path === '/admin/products'
     || (route.path.startsWith('/admin/products/') && route.path.endsWith('/edit'))
 
   let isActive = false
   if (type === 'new') isActive = isNewPage
   else if (type === 'categories') isActive = isCategoriesPage
+  else if (type === 'orders') isActive = isOrdersPage
   else isActive = isProductsPage
 
   return [

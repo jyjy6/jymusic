@@ -20,4 +20,8 @@ public final class EventTypes {
     public static final String STOCK_RESERVED          = "STOCK_RESERVED";
     public static final String STOCK_RESERVATION_FAILED = "STOCK_RESERVATION_FAILED";
     public static final String STOCK_RELEASED          = "STOCK_RELEASED";
+
+    // Notification Events
+    public static final String NOTI_ORDER_STATUS_CHANGED = "NOTI_ORDER_STATUS_CHANGED";
+    public static final String NOTI_ADMIN_ORDER_CREATED = "NOTI_ADMIN_ORDER_CREATED";
 }

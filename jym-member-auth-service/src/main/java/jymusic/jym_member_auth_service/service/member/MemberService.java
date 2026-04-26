@@ -7,6 +7,7 @@ import jymusic.jym_member_auth_service.domain.member.MemberRepository;
 import jymusic.jym_member_auth_service.dto.member.MemberLoginRequest;
 import jymusic.jym_member_auth_service.dto.member.MemberProfileResponse;
 import jymusic.jym_member_auth_service.dto.member.MemberRegistrationRequest;
+import jymusic.jym_member_auth_service.dto.member.InternalMemberSummaryResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -14,6 +15,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 
 @Slf4j
@@ -105,5 +108,31 @@ public class MemberService {
             // 이미 만료되었거나 유효하지 않은 토큰이어도 로그아웃은 정상 처리
             log.warn("로그아웃 시 토큰 파싱 실패 (무시): {}", e.getMessage());
         }
+    }
+
+    public InternalMemberSummaryResponse getMemberById(Long memberId) {
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new GlobalException("사용자를 찾을 수 없습니다.", "ERR_MEMBER_NOT_FOUND", HttpStatus.NOT_FOUND));
+        return InternalMemberSummaryResponse.fromEntity(member);
+    }
+
+    public List<InternalMemberSummaryResponse> searchMembers(String keyword) {
+        if (keyword == null || keyword.isBlank()) {
+            throw new GlobalException("keyword는 필수입니다.", "ERR_MISSING_PARAMETER", HttpStatus.BAD_REQUEST);
+        }
+
+        return memberRepository.findTop50ByUsernameContainingIgnoreCaseOrNicknameContainingIgnoreCase(keyword, keyword)
+                .stream()
+                .map(InternalMemberSummaryResponse::fromEntity)
+                .toList();
+    }
+
+    public List<InternalMemberSummaryResponse> getMembersBatch(Collection<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        return memberRepository.findByIdIn(ids).stream()
+                .map(InternalMemberSummaryResponse::fromEntity)
+                .toList();
     }
 }

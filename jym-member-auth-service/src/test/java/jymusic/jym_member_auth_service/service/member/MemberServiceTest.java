@@ -9,6 +9,7 @@ import jymusic.jym_member_auth_service.domain.member.Role;
 import jymusic.jym_member_auth_service.dto.member.MemberLoginRequest;
 import jymusic.jym_member_auth_service.dto.member.MemberProfileResponse;
 import jymusic.jym_member_auth_service.dto.member.MemberRegistrationRequest;
+import jymusic.jym_member_auth_service.dto.member.InternalMemberSummaryResponse;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -21,6 +22,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -309,6 +311,60 @@ class MemberServiceTest {
 
             memberService.logout("invalid.garbage.token");
             // 예외가 발생하지 않으면 테스트 통과
+        }
+    }
+
+    @Nested
+    @DisplayName("searchMembers()")
+    class SearchMembers {
+
+        @Test
+        @DisplayName("keyword가 비어있으면 BAD_REQUEST 예외가 발생한다")
+        void searchMembers_blankKeyword_throwsBadRequest() {
+            assertThatThrownBy(() -> memberService.searchMembers(" "))
+                    .isInstanceOf(GlobalException.class)
+                    .satisfies(ex -> {
+                        GlobalException ge = (GlobalException) ex;
+                        assertThat(ge.getHttpStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+                        assertThat(ge.getErrorCode()).isEqualTo("ERR_MISSING_PARAMETER");
+                    });
+        }
+
+        @Test
+        @DisplayName("keyword 검색 결과를 InternalMemberSummaryResponse 리스트로 반환한다")
+        void searchMembers_validKeyword_returnsSummaryList() {
+            given(memberRepository.findTop50ByUsernameContainingIgnoreCaseOrNicknameContainingIgnoreCase("test", "test"))
+                    .willReturn(java.util.List.of(activeMember()));
+
+            java.util.List<InternalMemberSummaryResponse> result = memberService.searchMembers("test");
+
+            assertThat(result).hasSize(1);
+            assertThat(result.get(0).getMemberId()).isEqualTo(MEMBER_ID);
+            assertThat(result.get(0).getUsername()).isEqualTo(USERNAME);
+        }
+    }
+
+    @Nested
+    @DisplayName("getMembersBatch()")
+    class GetMembersBatch {
+
+        @Test
+        @DisplayName("ids가 비어있으면 빈 리스트를 반환한다")
+        void getMembersBatch_emptyIds_returnsEmptyList() {
+            java.util.List<InternalMemberSummaryResponse> result = memberService.getMembersBatch(Set.of());
+            assertThat(result).isEmpty();
+            verify(memberRepository, never()).findByIdIn(any());
+        }
+
+        @Test
+        @DisplayName("ids로 회원을 조회해 요약 리스트로 반환한다")
+        void getMembersBatch_withIds_returnsSummaryList() {
+            given(memberRepository.findByIdIn(Set.of(MEMBER_ID))).willReturn(java.util.List.of(activeMember()));
+
+            java.util.List<InternalMemberSummaryResponse> result = memberService.getMembersBatch(Set.of(MEMBER_ID));
+
+            assertThat(result).hasSize(1);
+            assertThat(result.get(0).getMemberId()).isEqualTo(MEMBER_ID);
         }
     }
 }

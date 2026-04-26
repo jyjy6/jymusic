@@ -1,17 +1,18 @@
 package jymusic.jym_order_service.event.consumer;
 
-import tools.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jymusic.jym_order_service.domain.entity.Order;
 import jymusic.jym_order_service.domain.entity.OrderStatus;
+import jymusic.jym_order_service.domain.event.OrderStatusChangedDomainEvent;
 import jymusic.jym_order_service.domain.repository.OrderRepository;
 import jymusic.jym_order_service.event.common.EventEnvelope;
 import jymusic.jym_order_service.event.common.EventTypes;
 import jymusic.jym_order_service.event.common.KafkaTopics;
 import jymusic.jym_order_service.event.payload.*;
-import jymusic.jym_order_service.event.publisher.EventPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,7 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class OrderEventConsumer {
 
     private final OrderRepository orderRepository;
-    private final EventPublisher eventPublisher;
+    private final ApplicationEventPublisher applicationEventPublisher;
     private final ObjectMapper objectMapper;
 
     // ──────────────────────────────────────────
@@ -74,8 +75,10 @@ public class OrderEventConsumer {
                             payload.getOrderId(), order.getStatus());
                     return;
                 }
+                OrderStatus previous = order.getStatus();
                 order.transitionTo(OrderStatus.STOCK_RESERVED);
                 orderRepository.save(order);
+                publishStatusChanged(order, previous, OrderStatus.STOCK_RESERVED);
                 log.info("주문 상태 갱신: orderId={} → STOCK_RESERVED", payload.getOrderId());
             },
             () -> log.error("주문을 찾을 수 없음: orderId={}", payload.getOrderId())
@@ -92,8 +95,10 @@ public class OrderEventConsumer {
                     log.info("이미 취소된 주문, skip: orderId={}", payload.getOrderId());
                     return;
                 }
+                OrderStatus previous = order.getStatus();
                 order.transitionTo(OrderStatus.CANCELLED);
                 orderRepository.save(order);
+                publishStatusChanged(order, previous, OrderStatus.CANCELLED);
                 log.info("재고 예약 실패로 주문 취소: orderId={}, 사유=상품 '{}' 재고 부족",
                         payload.getOrderId(), payload.getFailedProductTitle());
             },
@@ -133,8 +138,10 @@ public class OrderEventConsumer {
                     log.info("이미 PAID 상태, skip: orderId={}", payload.getOrderId());
                     return;
                 }
+                OrderStatus previous = order.getStatus();
                 order.transitionTo(OrderStatus.PAID);
                 orderRepository.save(order);
+                publishStatusChanged(order, previous, OrderStatus.PAID);
                 log.info("결제 완료로 주문 상태 갱신: orderId={} → PAID", payload.getOrderId());
             },
             () -> log.error("주문을 찾을 수 없음: orderId={}", payload.getOrderId())
@@ -149,8 +156,10 @@ public class OrderEventConsumer {
                 if (order.getStatus() == OrderStatus.CANCELLED) {
                     return;
                 }
+                OrderStatus previous = order.getStatus();
                 order.transitionTo(OrderStatus.CANCELLED);
                 orderRepository.save(order);
+                publishStatusChanged(order, previous, OrderStatus.CANCELLED);
                 log.info("결제 실패로 주문 취소: orderId={}", payload.getOrderId());
             },
             () -> log.error("주문을 찾을 수 없음: orderId={}", payload.getOrderId())
@@ -165,8 +174,10 @@ public class OrderEventConsumer {
                 if (order.getStatus() == OrderStatus.CANCELLED) {
                     return;
                 }
+                OrderStatus previous = order.getStatus();
                 order.transitionTo(OrderStatus.CANCELLED);
                 orderRepository.save(order);
+                publishStatusChanged(order, previous, OrderStatus.CANCELLED);
                 log.info("결제 취소로 주문 취소: orderId={}", payload.getOrderId());
             },
             () -> log.error("주문을 찾을 수 없음: orderId={}", payload.getOrderId())
@@ -179,5 +190,17 @@ public class OrderEventConsumer {
 
     private <T> T convertPayload(EventEnvelope<?> envelope, Class<T> type) {
         return objectMapper.convertValue(envelope.getPayload(), type);
+    }
+
+    private void publishStatusChanged(Order order, OrderStatus previous, OrderStatus current) {
+        applicationEventPublisher.publishEvent(OrderStatusChangedDomainEvent.of(
+                order.getId(),
+                order.getMemberId(),
+                previous,
+                current,
+                order.getTotalAmount(),
+                order.getItems().isEmpty() ? "" : order.getItems().get(0).getProductTitle(),
+                order.getItems().size()
+        ));
     }
 }

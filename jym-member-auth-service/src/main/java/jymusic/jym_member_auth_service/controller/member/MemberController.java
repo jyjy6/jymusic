@@ -1,15 +1,15 @@
 package jymusic.jym_member_auth_service.controller.member;
 
 import jymusic.jym_member_auth_service.dto.member.MemberProfileResponse;
+import jymusic.jym_member_auth_service.dto.member.InternalMemberSummaryResponse;
 import jymusic.jym_member_auth_service.service.member.MemberService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/members")
@@ -33,5 +33,24 @@ public class MemberController {
 
         MemberProfileResponse response = memberService.getProfile(username);
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/search")
+    public ResponseEntity<List<InternalMemberSummaryResponse>> searchMembers(
+            @RequestParam String keyword
+    ) {
+        return ResponseEntity.ok(memberService.searchMembers(keyword));
+    }
+
+    @GetMapping("/batch")
+    public ResponseEntity<List<InternalMemberSummaryResponse>> getMembersBatch(
+            @RequestParam(name = "ids") List<Long> ids
+    ) {
+        return ResponseEntity.ok(memberService.getMembersBatch(ids));
+    }
+
+    @GetMapping("/{memberId}")
+    public ResponseEntity<InternalMemberSummaryResponse> getMemberById(@PathVariable Long memberId) {
+        return ResponseEntity.ok(memberService.getMemberById(memberId));
     }
 }

@@ -193,6 +193,192 @@ paths:
         '404':
           $ref: '#/components/responses/ErrorResponse'
 
+  # ─────────────────────────────────────────
+  # 관리자 주문 관리 (Admin Orders)
+  # ─────────────────────────────────────────
+  /admin/orders:
+    get:
+      tags:
+        - 관리자-주문
+      summary: 전체 주문 검색 (페이징)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: keyword
+          in: query
+          schema:
+            type: string
+        - name: productTitle
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/OrderStatus'
+        - name: statuses
+          in: query
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/OrderStatus'
+          style: form
+          explode: false
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: minAmount
+          in: query
+          schema:
+            type: integer
+            format: int64
+        - name: maxAmount
+          in: query
+          schema:
+            type: integer
+            format: int64
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+        - name: sort
+          in: query
+          schema:
+            type: string
+            default: createdAt,desc
+      responses:
+        '200':
+          description: 주문 페이지
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminOrderPage'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /admin/orders/{orderId}:
+    get:
+      tags:
+        - 관리자-주문
+      summary: 주문 상세 조회 (관리자)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 주문 상세
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminOrderDetailResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /admin/orders/{orderId}/status:
+    patch:
+      tags:
+        - 관리자-주문
+      summary: 주문 상태 변경 (관리자)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminStatusUpdateRequest'
+      responses:
+        '200':
+          description: 변경 결과
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminOrderDetailResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /admin/orders/stats:
+    get:
+      tags:
+        - 관리자-주문
+      summary: 상태별 주문 수
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 상태별 카운트
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: integer
+                  format: int64
+
+  # ─────────────────────────────────────────
+  # 알림 (SSE)
+  # ─────────────────────────────────────────
+  /notifications/stream:
+    get:
+      tags:
+        - 알림
+      summary: 사용자 실시간 알림 스트림 구독
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: SSE 스트림 연결 성공
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /notifications/admin/stream:
+    get:
+      tags:
+        - 알림
+      summary: 관리자 실시간 알림 스트림 구독
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: SSE 스트림 연결 성공
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+
 components:
   securitySchemes:
     bearerAuth:
@@ -209,6 +395,10 @@ components:
             $ref: '#/components/schemas/ErrorResponse'
 
   schemas:
+    OrderStatus:
+      type: string
+      enum: [PENDING, STOCK_RESERVED, PAID, SHIPPED, COMPLETED, CANCELLED]
+
     # ── 장바구니 스키마 ──
     CartItem:
       type: object
@@ -301,9 +491,7 @@ components:
           type: number
           description: 총 결제 예정 금액
         status:
-          type: string
-          description: 주문 상태
-          enum: [PENDING, PAID, SHIPPED, COMPLETED, CANCELLED]
+          $ref: '#/components/schemas/OrderStatus'
         createdAt:
           type: string
           format: date-time
@@ -317,7 +505,7 @@ components:
         totalAmount:
           type: number
         status:
-          type: string
+          $ref: '#/components/schemas/OrderStatus'
         items:
           type: array
           description: 주문 상세 상품 내역
@@ -339,6 +527,77 @@ components:
           type: number
           description: 주문 당시 개당 가격
         quantity:
+          type: integer
+
+    AdminStatusUpdateRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        reason:
+          type: string
+          maxLength: 255
+
+    AdminOrderSummaryResponse:
+      type: object
+      properties:
+        orderId:
+          type: integer
+          format: int64
+        memberId:
+          type: integer
+          format: int64
+        username:
+          type: string
+        nickname:
+          type: string
+        totalAmount:
+          type: number
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        itemCount:
+          type: integer
+        firstItemTitle:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    AdminOrderDetailResponse:
+      allOf:
+        - $ref: '#/components/schemas/AdminOrderSummaryResponse'
+        - type: object
+          properties:
+            email:
+              type: string
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/OrderItemDetail'
+            allowedNextStatuses:
+              type: array
+              items:
+                $ref: '#/components/schemas/OrderStatus'
+
+    AdminOrderPage:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminOrderSummaryResponse'
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+        number:
+          type: integer
+        size:
           type: integer
 
     ErrorResponse:

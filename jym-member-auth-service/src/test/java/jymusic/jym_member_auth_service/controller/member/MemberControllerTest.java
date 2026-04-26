@@ -3,6 +3,7 @@ package jymusic.jym_member_auth_service.controller.member;
 import jymusic.jym_member_auth_service.common.GlobalErrorHandler.GlobalException;
 import jymusic.jym_member_auth_service.config.SpringSecurityConfig;
 import jymusic.jym_member_auth_service.domain.member.Role;
+import jymusic.jym_member_auth_service.dto.member.InternalMemberSummaryResponse;
 import jymusic.jym_member_auth_service.dto.member.MemberProfileResponse;
 import jymusic.jym_member_auth_service.service.member.MemberService;
 import org.junit.jupiter.api.DisplayName;
@@ -14,6 +15,8 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+
+import java.util.List;
 
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -81,6 +84,62 @@ class MemberControllerTest {
                             .header("X-User-Name", GATEWAY_USERNAME))
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.code").value("ERR_MEMBER_NOT_FOUND"));
+        }
+    }
+
+    @Nested
+    @DisplayName("내부 조회 API")
+    class InternalMemberApis {
+
+        @Test
+        @DisplayName("GET /api/v1/members/search?keyword=... -> 200")
+        void searchMembers_returns200() throws Exception {
+            given(memberService.searchMembers("tester"))
+                    .willReturn(List.of(InternalMemberSummaryResponse.builder()
+                            .memberId(1L)
+                            .username("tester")
+                            .nickname("테스터")
+                            .email("tester@example.com")
+                            .build()));
+
+            mockMvc.perform(get("/api/v1/members/search")
+                            .param("keyword", "tester"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$[0].memberId").value(1L))
+                    .andExpect(jsonPath("$[0].username").value("tester"));
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/members/batch?ids=1,2 -> 200")
+        void batchMembers_returns200() throws Exception {
+            given(memberService.getMembersBatch(List.of(1L, 2L)))
+                    .willReturn(List.of(
+                            InternalMemberSummaryResponse.builder().memberId(1L).username("u1").nickname("n1").email("u1@test.com").build(),
+                            InternalMemberSummaryResponse.builder().memberId(2L).username("u2").nickname("n2").email("u2@test.com").build()
+                    ));
+
+            mockMvc.perform(get("/api/v1/members/batch")
+                            .param("ids", "1,2"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$[0].memberId").value(1L))
+                    .andExpect(jsonPath("$[1].memberId").value(2L));
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/members/{memberId} -> 200")
+        void getMemberById_returns200() throws Exception {
+            given(memberService.getMemberById(10L))
+                    .willReturn(InternalMemberSummaryResponse.builder()
+                            .memberId(10L)
+                            .username("u10")
+                            .nickname("n10")
+                            .email("u10@test.com")
+                            .build());
+
+            mockMvc.perform(get("/api/v1/members/10"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.memberId").value(10L))
+                    .andExpect(jsonPath("$.username").value("u10"));
         }
     }
 }

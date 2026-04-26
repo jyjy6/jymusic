@@ -222,3 +222,53 @@ public class StockEventConsumer {
         );
     }
 }
+
+
+
+
+/**
+ * 코드의 잠재적 위험 요소 (Review)
+ * Saga 패턴 구현 관점에서 몇 가지 주의할 점이 보입니다:
+ *
+ * 원자성(Atomicity) 문제:
+ * rollbackReservedItems 내부에서도 productRepository.save()를 호출합니다. 만약 여기서 에러가 나면 진짜 복잡해집니다. 사실 @Transactional 환경이라면, 수동 롤백보다는 성공한 것들만 모아서 최종적으로 한 번에 저장하거나, 실패 시 비즈니스 예외를 던지고 TransactionPhase.AFTER_ROLLBACK에서 이벤트를 발행하는 것이 더 깔끔할 수 있습니다.
+ *
+ * 비관적 락(Pessimistic Lock)의 부재:
+ * 주석에도 써두셨듯이, findById는 락을 걸지 않습니다.
+ *
+ * Thread A가 상품 재고 1개를 확인하고 0으로 만듦 (아직 save 전).
+ *
+ * Thread B가 동시에 상품 재고 1개를 확인하고 0으로 만듦.
+ *
+ * 결과적으로 재고는 1개였는데 2개가 예약되는 Lost Update 문제가 발생합니다. 실전에서는 반드시 LockModeType.PESSIMISTIC_WRITE가 필요합니다.
+ *
+ *
+ *
+ * 방법 A: @TransactionalEventListener 사용 (추천)
+ * Spring에서 제공하는 기능을 사용하면, DB는 롤백하되 이벤트 발행은 롤백 이후에 따로 실행할 수 있습니다.
+ * // 1. 서비스 로직에서는 예외만 던짐
+ * if (product == null || !product.reserveStock(item.getQuantity())) {
+ *     throw new StockShortageException(payload.getOrderId()); // 예외 발생! DB는 롤백됨
+ * }
+ *
+ * // 2. 리스너에서 롤백된 후에 이벤트를 발행
+ * @TransactionalEventListener(phase = TransactionPhase.AFTER_ROLLBACK)
+ * public void handleRollback(StockShortageException ex) {
+ *     // DB는 깨끗하게 롤백된 상태에서 실패 이벤트만 Kafka로 전송
+ *     eventPublisher.publish(KafkaTopics.STOCK_EVENTS, ... STOCK_RESERVATION_FAILED);
+ * }
+ *
+ *
+ *
+ *
+
+ *
+ * */
+
+
+
+
+
+
+
+

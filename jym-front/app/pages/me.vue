@@ -69,8 +69,14 @@
         </div>
       </div>
 
-      <!-- 로그아웃 버튼 -->
-      <div class="mt-6 flex justify-end">
+      <!-- 액션 버튼 -->
+      <div class="mt-6 flex justify-end gap-2">
+        <NuxtLink
+          to="/me/orders"
+          class="flex items-center gap-2 px-5 py-2.5 rounded-lg border border-indigo-200 text-indigo-700 hover:bg-indigo-50 transition-colors font-medium text-sm"
+        >
+          내 주문 보러가기
+        </NuxtLink>
         <button
           @click="handleLogout"
           :disabled="loggingOut"

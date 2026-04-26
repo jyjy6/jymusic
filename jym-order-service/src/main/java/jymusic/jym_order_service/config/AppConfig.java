@@ -12,4 +12,9 @@ public class AppConfig {
     public RestClient catalogRestClient(@Value("${services.catalog.url}") String url) {
         return RestClient.builder().baseUrl(url).build();
     }
+
+    @Bean
+    public RestClient memberAuthRestClient(@Value("${services.member-auth.url}") String url) {
+        return RestClient.builder().baseUrl(url).build();
+    }
 }

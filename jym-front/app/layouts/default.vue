@@ -23,12 +23,19 @@
             <CartIcon />
             <template v-if="authStore.isLoggedIn">
               <NuxtLink
+                to="/me/orders"
+                class="text-sm text-gray-600 hover:text-indigo-600 font-medium transition-colors px-2 py-1 rounded-md hover:bg-indigo-50"
+              >
+                내 주문
+              </NuxtLink>
+              <NuxtLink
                 v-if="authStore.user?.role === 'ROLE_ADMIN'"
                 to="/admin/products"
                 class="text-sm text-gray-600 hover:text-indigo-600 font-medium transition-colors px-2 py-1 rounded-md hover:bg-indigo-50"
               >
                 관리
               </NuxtLink>
+              <NotificationBell />
               <span class="text-sm text-gray-500 hidden sm:block">
                 <span class="font-semibold text-gray-800">{{ authStore.user?.nickname }}</span> 님
               </span>
@@ -75,6 +82,7 @@
 import type { AxiosInstance } from 'axios'
 import AppToast from '~/components/AppToast.vue'
 import CartIcon from '~/components/cart/CartIcon.vue'
+import NotificationBell from '~/components/notifications/NotificationBell.vue'
 import { useAuthStore } from '~/stores/auth'
 
 const authStore = useAuthStore()
