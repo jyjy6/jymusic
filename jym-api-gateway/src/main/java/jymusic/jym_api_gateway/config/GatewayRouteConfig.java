@@ -31,7 +31,7 @@ public class GatewayRouteConfig {
                         .path("/api/v1/products/**", "/api/v1/categories/**", "/api/v1/media/**")
                         .uri(catalogUrl))
                 .route("order_service", r -> r
-                        .path("/api/v1/cart/**", "/api/v1/orders/**")
+                        .path("/api/v1/cart/**", "/api/v1/orders/**", "/api/v1/notifications/**")
                         .uri(orderUrl))
                 .route("payment_service", r -> r
                         .path("/api/v1/payments/**")

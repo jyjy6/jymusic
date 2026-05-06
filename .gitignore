@@ -52,5 +52,9 @@ application-*.yml
 *.p12
 
 
+.gradle/
+.gradle-home/
+build/
+
 
 developer_assessment.md
