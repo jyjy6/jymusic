@@ -7,8 +7,9 @@ import jymusic.jym_catalog_service.domain.repository.StockReservationRepository;
 import jymusic.jym_catalog_service.event.common.EventEnvelope;
 import jymusic.jym_catalog_service.event.common.EventTypes;
 import jymusic.jym_catalog_service.event.common.KafkaTopics;
+import jymusic.jym_catalog_service.event.inbox.InboxIdempotencyGuard;
+import jymusic.jym_catalog_service.event.outbox.OutboxEventRecorder;
 import jymusic.jym_catalog_service.event.payload.*;
-import jymusic.jym_catalog_service.event.publisher.EventPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -34,9 +35,12 @@ import java.util.Map;
 @Slf4j
 public class StockEventConsumer {
 
+    private static final String CONSUMER_GROUP = "jym-catalog-service-group";
+
     private final ProductRepository productRepository;
     private final StockReservationRepository stockReservationRepository;
-    private final EventPublisher eventPublisher;
+    private final OutboxEventRecorder outboxEventRecorder;
+    private final InboxIdempotencyGuard inboxIdempotencyGuard;
     private final ObjectMapper objectMapper;
 
     // ──────────────────────────────────────────
@@ -45,11 +49,16 @@ public class StockEventConsumer {
 
     @KafkaListener(
         topics = KafkaTopics.ORDER_EVENTS,
-        groupId = "jym-catalog-service-group"
+        groupId = CONSUMER_GROUP
     )
     @Transactional
     public void handleOrderEvent(ConsumerRecord<String, EventEnvelope<?>> record) {
         EventEnvelope<?> envelope = record.value();
+
+        if (!inboxIdempotencyGuard.tryMarkProcessed(
+                envelope.getEventId(), CONSUMER_GROUP, envelope.getEventType(), record)) {
+            return;
+        }
 
         switch (envelope.getEventType()) {
             case EventTypes.ORDER_CREATED -> handleOrderCreated(envelope);
@@ -86,11 +95,13 @@ public class StockEventConsumer {
                     .orElse(null);
 
             if (product == null || !product.reserveStock(item.getQuantity())) {
-                // 재고 부족 → 이미 예약한 항목 롤백 후 실패 이벤트 발행
+                // 재고 부족 → 이미 예약한 항목 롤백 후 실패 이벤트를 Outbox 에 기록.
+                // (재고 변경 + outbox INSERT 가 같은 트랜잭션에 묶여 정합성이 보장됨)
                 rollbackReservedItems(reservedItems);
 
-                eventPublisher.publish(
+                outboxEventRecorder.record(
                         KafkaTopics.STOCK_EVENTS,
+                        "STOCK",
                         payload.getOrderId().toString(),
                         EventTypes.STOCK_RESERVATION_FAILED,
                         StockReservationFailedPayload.builder()
@@ -128,9 +139,10 @@ public class StockEventConsumer {
         }
         stockReservationRepository.save(reservation);
 
-        // 모든 상품 재고 예약 성공
-        eventPublisher.publish(
+        // 모든 상품 재고 예약 성공 — Outbox 에 기록 (같은 트랜잭션)
+        outboxEventRecorder.record(
                 KafkaTopics.STOCK_EVENTS,
+                "STOCK",
                 payload.getOrderId().toString(),
                 EventTypes.STOCK_RESERVED,
                 StockReservedPayload.builder()
@@ -170,12 +182,17 @@ public class StockEventConsumer {
 
     @KafkaListener(
         topics = KafkaTopics.PAYMENT_EVENTS,
-        groupId = "jym-catalog-service-group"
+        groupId = CONSUMER_GROUP
     )
     @Transactional
     @SuppressWarnings("unchecked")
     public void handlePaymentEvent(ConsumerRecord<String, EventEnvelope<?>> record) {
         EventEnvelope<?> envelope = record.value();
+
+        if (!inboxIdempotencyGuard.tryMarkProcessed(
+                envelope.getEventId(), CONSUMER_GROUP, envelope.getEventType(), record)) {
+            return;
+        }
 
         switch (envelope.getEventType()) {
             case EventTypes.PAYMENT_FAILED -> handleStockRelease(envelope, "결제 실패");

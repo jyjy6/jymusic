@@ -8,6 +8,7 @@ import jymusic.jym_order_service.domain.repository.OrderRepository;
 import jymusic.jym_order_service.event.common.EventEnvelope;
 import jymusic.jym_order_service.event.common.EventTypes;
 import jymusic.jym_order_service.event.common.KafkaTopics;
+import jymusic.jym_order_service.event.inbox.InboxIdempotencyGuard;
 import jymusic.jym_order_service.event.payload.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,8 +33,11 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 public class OrderEventConsumer {
 
+    private static final String CONSUMER_GROUP = "jym-order-service-group";
+
     private final OrderRepository orderRepository;
     private final ApplicationEventPublisher applicationEventPublisher;
+    private final InboxIdempotencyGuard inboxIdempotencyGuard;
     private final ObjectMapper objectMapper;
 
     // ──────────────────────────────────────────
@@ -48,7 +52,7 @@ public class OrderEventConsumer {
      */
     @KafkaListener(
         topics = KafkaTopics.STOCK_EVENTS,
-        groupId = "jym-order-service-group",
+        groupId = CONSUMER_GROUP,
         containerFactory = "kafkaListenerContainerFactory"
     )
     @Transactional
@@ -56,6 +60,11 @@ public class OrderEventConsumer {
         EventEnvelope<?> envelope = record.value();
         log.info("Stock 이벤트 수신: type={}, orderId={}",
                 envelope.getEventType(), record.key());
+
+        if (!inboxIdempotencyGuard.tryMarkProcessed(
+                envelope.getEventId(), CONSUMER_GROUP, envelope.getEventType(), record)) {
+            return;
+        }
 
         switch (envelope.getEventType()) {
             case EventTypes.STOCK_RESERVED -> handleStockReserved(envelope);
@@ -112,7 +121,7 @@ public class OrderEventConsumer {
 
     @KafkaListener(
         topics = KafkaTopics.PAYMENT_EVENTS,
-        groupId = "jym-order-service-group",
+        groupId = CONSUMER_GROUP,
         containerFactory = "kafkaListenerContainerFactory"
     )
     @Transactional
@@ -120,6 +129,11 @@ public class OrderEventConsumer {
         EventEnvelope<?> envelope = record.value();
         log.info("Payment 이벤트 수신: type={}, orderId={}",
                 envelope.getEventType(), record.key());
+
+        if (!inboxIdempotencyGuard.tryMarkProcessed(
+                envelope.getEventId(), CONSUMER_GROUP, envelope.getEventType(), record)) {
+            return;
+        }
 
         switch (envelope.getEventType()) {
             case EventTypes.PAYMENT_COMPLETED -> handlePaymentCompleted(envelope);

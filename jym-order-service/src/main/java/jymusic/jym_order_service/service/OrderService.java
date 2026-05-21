@@ -13,9 +13,9 @@ import jymusic.jym_order_service.dto.response.OrderDetailResponse;
 import jymusic.jym_order_service.dto.response.OrderResponse;
 import jymusic.jym_order_service.event.common.EventTypes;
 import jymusic.jym_order_service.event.common.KafkaTopics;
+import jymusic.jym_order_service.event.outbox.OutboxEventRecorder;
 import jymusic.jym_order_service.event.payload.OrderCreatedPayload;
 import jymusic.jym_order_service.event.payload.OrderItemPayload;
-import jymusic.jym_order_service.event.publisher.EventPublisher;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -33,7 +33,7 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final CartRepository cartRepository;
     private final CatalogClient catalogClient;
-    private final EventPublisher eventPublisher;
+    private final OutboxEventRecorder outboxEventRecorder;
 
     @Transactional
     public OrderResponse createOrder(Long memberId, OrderCreateRequest request) {
@@ -78,17 +78,18 @@ public class OrderService {
             cartRepository.save(cart);
         });
 
-        // 4. [NEW] ORDER_CREATED 이벤트 발행
-        publishOrderCreatedEvent(savedOrder);
+        // 4. ORDER_CREATED 이벤트를 Outbox 에 기록 (같은 트랜잭션 — dual write 방지)
+        recordOrderCreatedToOutbox(savedOrder);
 
         return OrderResponse.from(savedOrder);
     }
 
     /**
-     * 주문 생성 이벤트 발행.
-     * Kafka로 발행하여 catalog-service가 재고를 예약하도록 트리거.
+     * 주문 생성 이벤트를 Outbox 테이블에 기록합니다.
+     * 같은 DB 트랜잭션 안에서 INSERT 되므로 정합성이 보장되며,
+     * 실제 Kafka 발행은 OutboxPublisher 가 비동기로 수행합니다.
      */
-    private void publishOrderCreatedEvent(Order order) {
+    private void recordOrderCreatedToOutbox(Order order) {
         OrderCreatedPayload payload = OrderCreatedPayload.builder()
                 .orderId(order.getId())
                 .memberId(order.getMemberId())
@@ -103,9 +104,10 @@ public class OrderService {
                         .toList())
                 .build();
 
-        eventPublisher.publish(
+        outboxEventRecorder.record(
                 KafkaTopics.ORDER_EVENTS,
-                order.getId().toString(),  // Kafka key = orderId
+                "ORDER",
+                order.getId().toString(),
                 EventTypes.ORDER_CREATED,
                 payload
         );

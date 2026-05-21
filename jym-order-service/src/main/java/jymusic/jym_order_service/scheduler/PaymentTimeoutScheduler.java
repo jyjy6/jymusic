@@ -5,8 +5,8 @@ import jymusic.jym_order_service.domain.entity.OrderStatus;
 import jymusic.jym_order_service.domain.repository.OrderRepository;
 import jymusic.jym_order_service.event.common.EventTypes;
 import jymusic.jym_order_service.event.common.KafkaTopics;
+import jymusic.jym_order_service.event.outbox.OutboxEventRecorder;
 import jymusic.jym_order_service.event.payload.OrderCancelledPayload;
-import jymusic.jym_order_service.event.publisher.EventPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -26,7 +26,7 @@ import java.util.List;
 public class PaymentTimeoutScheduler {
 
     private final OrderRepository orderRepository;
-    private final EventPublisher eventPublisher;
+    private final OutboxEventRecorder outboxEventRecorder;
 
     @Scheduled(fixedRate = 60000)  // 1분마다 실행
     @Transactional
@@ -43,9 +43,10 @@ public class PaymentTimeoutScheduler {
             order.transitionTo(OrderStatus.CANCELLED);
             orderRepository.save(order);
 
-            // 재고 복원을 위한 ORDER_CANCELLED 이벤트 발행
-            eventPublisher.publish(
+            // 재고 복원용 ORDER_CANCELLED 이벤트를 Outbox 에 기록 (같은 트랜잭션)
+            outboxEventRecorder.record(
                     KafkaTopics.ORDER_EVENTS,
+                    "ORDER",
                     order.getId().toString(),
                     EventTypes.ORDER_CANCELLED,
                     OrderCancelledPayload.builder()

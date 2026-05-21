@@ -12,10 +12,10 @@ import jymusic.jym_payment_service.dto.request.PaymentPrepareRequest;
 import jymusic.jym_payment_service.dto.response.*;
 import jymusic.jym_payment_service.event.common.EventTypes;
 import jymusic.jym_payment_service.event.common.KafkaTopics;
+import jymusic.jym_payment_service.event.outbox.OutboxEventRecorder;
 import jymusic.jym_payment_service.event.payload.PaymentCancelledPayload;
 import jymusic.jym_payment_service.event.payload.PaymentCompletedPayload;
 import jymusic.jym_payment_service.event.payload.PaymentFailedPayload;
-import jymusic.jym_payment_service.event.publisher.EventPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -34,7 +34,7 @@ public class PaymentService {
     private final PaymentPrepareRepository paymentPrepareRepository;
     private final OrderClient orderClient;
     private final TossPaymentsClient tossClient;
-    private final EventPublisher eventPublisher;
+    private final OutboxEventRecorder outboxEventRecorder;
 
     @Transactional
     public PaymentPrepareResponse prepare(Long memberId, PaymentPrepareRequest request) {
@@ -101,9 +101,10 @@ public class PaymentService {
             Payment savedPayment = paymentRepository.save(payment);
             paymentPrepareRepository.deleteByOrderId(request.getOrderId());
 
-            // [CHANGED] REST 호출 → Kafka 이벤트 발행
-            eventPublisher.publish(
+            // PAYMENT_COMPLETED 이벤트를 Outbox 에 기록 (같은 트랜잭션 — dual write 방지)
+            outboxEventRecorder.record(
                     KafkaTopics.PAYMENT_EVENTS,
+                    "PAYMENT",
                     request.getOrderId().toString(),
                     EventTypes.PAYMENT_COMPLETED,
                     PaymentCompletedPayload.builder()
@@ -118,9 +119,12 @@ public class PaymentService {
             return PaymentConfirmResponse.from(savedPayment);
 
         } catch (GlobalException e) {
-            // Toss API 거절 (카드 한도 초과, 유효하지 않은 카드 등)
-            eventPublisher.publish(
+            // Toss API 거절 (카드 한도 초과, 유효하지 않은 카드 등).
+            // 본 트랜잭션은 throw 로 인해 롤백되므로 outbox INSERT 는
+            // 반드시 별도 트랜잭션(REQUIRES_NEW)으로 commit 시켜야 한다.
+            outboxEventRecorder.recordInNewTransaction(
                     KafkaTopics.PAYMENT_EVENTS,
+                    "PAYMENT",
                     request.getOrderId().toString(),
                     EventTypes.PAYMENT_FAILED,
                     PaymentFailedPayload.builder()
@@ -129,7 +133,7 @@ public class PaymentService {
                             .reason(e.getMessage())
                             .build()
             );
-            throw e;  // 프론트에 에러 응답
+            throw e;
         }
     }
 
@@ -149,9 +153,10 @@ public class PaymentService {
         tossClient.cancelPayment(request.getPaymentKey(), request.getCancelReason(), request.getCancelAmount());
         payment.markCancelled(LocalDateTime.now());
 
-        // [CHANGED] REST 호출 → Kafka 이벤트 발행
-        eventPublisher.publish(
+        // PAYMENT_CANCELLED 이벤트를 Outbox 에 기록 (같은 트랜잭션 — dual write 방지)
+        outboxEventRecorder.record(
                 KafkaTopics.PAYMENT_EVENTS,
+                "PAYMENT",
                 payment.getOrderId().toString(),
                 EventTypes.PAYMENT_CANCELLED,
                 PaymentCancelledPayload.builder()
