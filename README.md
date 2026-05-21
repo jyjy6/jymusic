@@ -1,5 +1,7 @@
 # Jymusic
 
+🌐 Language: [한국어](README.md) | [日本語](README.ja.md)
+
 **음악 앨범 판매 이커머스 플랫폼** — Microservices Architecture (MSA) 기반
 
 ---
@@ -66,6 +68,7 @@ jymusic/
 
 - **비동기 이벤트 스트리밍 (Kafka)**: 서비스 간 결합도를 낮추고 처리량을 높이기 위해 Kafka를 통한 이벤트 기반 통신을 수행합니다. 처리 실패 메시지는 DLT(Dead Letter Topic)로 분리되어 안전하게 관리됩니다.
 - **Saga 패턴 (Choreography)**: 주문, 결제, 재고(Catalog) 서비스 등 여러 서비스에 걸친 분산 트랜잭션의 데이터 일관성을 보장합니다. 결제 실패나 재고 부족 등 에러 발생 시 Kafka 이벤트를 발행하고 소비하여 보상 트랜잭션(주문 취소, 재고 복구)을 자동으로 실행합니다.
+- **Transactional Outbox / Inbox 패턴**: DB 저장과 Kafka 발행이 같은 트랜잭션에 묶이지 않아 발생하는 Dual-Write 문제를 해결합니다. 도메인 데이터와 발행 이벤트를 같은 트랜잭션에서 `outbox_event` 에 함께 INSERT 한 뒤, 별도 폴링 퍼블리셔가 Kafka 로 발행합니다(Exponential Backoff 재시도 포함). 컨슈머 측은 `inbox_event` 의 `(eventId, consumerGroup)` unique 제약으로 중복 소비를 차단하여 **effectively exactly-once** 처리를 보장합니다.
 - **Circuit Breaker & Retry (Resilience4j)**: 불가피한 동기적 REST API 호출(상품 정보, 주문 금액 조회 등) 지점에 적용되어 있습니다. 타 서비스로의 장애 전파(Cascading Failure)를 차단하고, 빠른 실패(Fast Failure) 및 Fallback 처리를 통해 시스템 전체의 안정성을 확보합니다.
 
 ### 핵심 동작 단계별 흐름 (Saga & Circuit Breaker)
